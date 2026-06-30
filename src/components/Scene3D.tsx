@@ -6,6 +6,7 @@ import { useProjectStore } from '../store/useProjectStore'
 import { useUiStore } from '../store/useUiStore'
 import { MM, partSize, projectBounds, thicknessOf } from '../lib/geometry'
 import { aabbOf, snapToFaces } from '../lib/snap'
+import { applyDim, computeDims } from '../lib/dimensions'
 import type { Material, Part } from '../types'
 
 const FACE_SNAP_THRESHOLD = 25 // мм, радиус притяжения граней
@@ -45,6 +46,83 @@ function PartMesh({
       />
       <Edges threshold={15} color={selected ? '#60a5fa' : '#5b6770'} />
     </mesh>
+  )
+}
+
+function DimensionChips({
+  parts,
+  materials,
+  selectedId,
+}: {
+  parts: Part[]
+  materials: Material[]
+  selectedId: string | null
+}) {
+  const updatePart = useProjectStore((s) => s.updatePart)
+  const beginInteraction = useProjectStore((s) => s.beginInteraction)
+  const showDims = useUiStore((s) => s.showDims)
+  const dimMode = useUiStore((s) => s.dimMode)
+  const [editKey, setEditKey] = useState<string | null>(null)
+  const [text, setText] = useState('')
+
+  const sel = selectedId ? parts.find((p) => p.id === selectedId) : undefined
+  if (!sel || !showDims) return null
+
+  const others = parts.filter((p) => p.id !== selectedId)
+  const chips = computeDims(sel, others, materials, dimMode)
+
+  const commit = (chip: (typeof chips)[number]) => {
+    const v = parseFloat(text)
+    setEditKey(null)
+    if (!isFinite(v)) return
+    const neighbor = parts.find((p) => p.id === chip.neighborId)
+    if (!neighbor) return
+    beginInteraction()
+    updatePart(sel.id, { position: applyDim(sel, neighbor, materials, chip, dimMode, v) })
+  }
+
+  return (
+    <>
+      {chips.map((chip) => {
+        const key = `${chip.axis}:${chip.side}:${chip.neighborId}`
+        const pos: [number, number, number] = [
+          chip.anchor[0] * MM,
+          chip.anchor[1] * MM,
+          chip.anchor[2] * MM,
+        ]
+        const editing = editKey === key
+        return (
+          <Html key={key} position={pos} center zIndexRange={[30, 0]}>
+            {editing ? (
+              <input
+                className="dim-input"
+                autoFocus
+                inputMode="decimal"
+                value={text}
+                onChange={(e) => setText(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') commit(chip)
+                  else if (e.key === 'Escape') setEditKey(null)
+                }}
+                onBlur={() => commit(chip)}
+              />
+            ) : (
+              <button
+                className={'dim-chip' + (chip.value < 0 ? ' neg' : '')}
+                title="Кликни и введи размер"
+                onPointerDown={(e) => {
+                  e.stopPropagation()
+                  setText(String(chip.value))
+                  setEditKey(key)
+                }}
+              >
+                {chip.value}
+              </button>
+            )}
+          </Html>
+        )
+      })}
+    </>
   )
 }
 
@@ -159,6 +237,7 @@ function SceneContent() {
       ))}
 
       <SelectionLabel parts={parts} materials={materials} selectedId={selectedId} />
+      <DimensionChips parts={parts} materials={materials} selectedId={selectedId} />
 
       {target && (
         <TransformControls

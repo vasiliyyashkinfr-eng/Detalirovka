@@ -7,6 +7,8 @@ interface UiStore {
   snapGrid: boolean // привязка к сетке вкл/выкл
   faceSnap: boolean // прилипание к граням соседних деталей
   gap: number // зазор для прилипания и точной расстановки, мм
+  showDims: boolean // показывать редактируемые размеры в 3D
+  dimMode: 'clear' | 'center' // тип размеров: в свету / по осям
   set: (patch: Partial<Omit<UiStore, 'set'>>) => void
 }
 
@@ -15,5 +17,7 @@ export const useUiStore = create<UiStore>((set) => ({
   snapGrid: true,
   faceSnap: true,
   gap: 0,
+  showDims: true,
+  dimMode: 'clear',
   set: (patch) => set(patch),
 }))
