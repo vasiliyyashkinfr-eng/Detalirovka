@@ -74,11 +74,13 @@ export type Direction = 'up' | 'down' | 'right' | 'left' | 'front' | 'back'
 
 /**
  * Тип измерения расстояния:
- *  - center — между осями (середина толщины ↔ середина толщины);
- *  - clear  — в свету (между обращёнными друг к другу гранями/кромками);
- *  - outer  — по внешним кромкам (общий габарит от внешней грани до внешней).
+ *  - center      — между осями (середина толщины ↔ середина толщины);
+ *  - clear       — в свету (между обращёнными друг к другу кромками);
+ *  - outer       — по внешним кромкам (общий габарит);
+ *  - edge-center — от кромки этой детали до центра опорной;
+ *  - center-edge — от центра этой детали до кромки опорной.
  */
-export type Measure = 'center' | 'clear' | 'outer'
+export type Measure = 'center' | 'clear' | 'outer' | 'edge-center' | 'center-edge'
 
 export const DIRECTIONS: { value: Direction; label: string }[] = [
   { value: 'up', label: 'Выше (Y+)' },
@@ -90,8 +92,10 @@ export const DIRECTIONS: { value: Direction; label: string }[] = [
 ]
 
 export const MEASURES: { value: Measure; label: string }[] = [
-  { value: 'clear', label: 'В свету (между кромками)' },
+  { value: 'clear', label: 'В свету (кромка–кромка)' },
   { value: 'center', label: 'По осям (центр–центр)' },
+  { value: 'edge-center', label: 'Кромка → центр опорной' },
+  { value: 'center-edge', label: 'Центр → кромка опорной' },
   { value: 'outer', label: 'По внешним кромкам' },
 ]
 
@@ -123,6 +127,10 @@ export function measureDistance(
       return sign * (mc - sign * hm - (tc + sign * th))
     case 'outer':
       return sign * (mc + sign * hm - (tc - sign * th))
+    case 'edge-center':
+      return sign * (mc - sign * hm - tc)
+    case 'center-edge':
+      return sign * (mc - (tc + sign * th))
   }
 }
 
@@ -152,6 +160,12 @@ export function positionByDistance(
       break
     case 'outer':
       c[axis] = tc + sign * (value - th - hm)
+      break
+    case 'edge-center':
+      c[axis] = tc + sign * (value + hm)
+      break
+    case 'center-edge':
+      c[axis] = tc + sign * (value + th)
       break
   }
   return c
