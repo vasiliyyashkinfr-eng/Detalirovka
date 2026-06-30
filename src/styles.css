@@ -323,6 +323,18 @@ input[type=checkbox] { width: auto; }
   gap: 10px;
 }
 .editor-title { font-weight: 600; font-size: 13px; }
+.edge-table { width: 100%; border-collapse: collapse; }
+.edge-table th {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--muted);
+  text-align: center;
+  padding: 2px 4px;
+}
+.edge-table th:first-child { text-align: left; }
+.edge-table td { padding: 3px 4px; font-size: 12px; vertical-align: middle; }
+.edge-table td:first-child { white-space: nowrap; }
+.edge-table input { text-align: center; padding: 6px 4px; }
 .editor { display: flex; flex-direction: column; gap: 10px; }
 .edges-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .edge-select { flex-direction: row; align-items: center; justify-content: space-between; gap: 6px; }

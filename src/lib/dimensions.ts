@@ -72,14 +72,66 @@ export function computeDims(
   return chips
 }
 
+export type DimKind = 'gap' | 'min' | 'max'
+
 export interface PairDim {
   axis: 0 | 1 | 2
   start: Vec3 // измеряемая точка 1 (на грани), мм
   end: Vec3 // измеряемая точка 2 (на грани), мм — отличается от start только по [axis]
   offsetAxis: 0 | 1 | 2 // ось, вдоль которой размерная линия вынесена наружу
   offset: number // смещение размерной линии от измеряемых точек, мм (со знаком)
-  value: number // показываемое значение, мм
-  kind: 'gap' | 'edge'
+  value: number // показываемое значение (модуль), мм
+  kind: DimKind
+  sign: 1 | -1 // направление текущей разницы (для редактирования)
+}
+
+export interface EdgeDiff {
+  axis: 0 | 1 | 2
+  kind: 'min' | 'max'
+  value: number // модуль разницы кромок, мм
+  sign: 1 | -1
+}
+
+const AXIS_LABEL = ['X (ширина)', 'Y (высота)', 'Z (глубина)'] as const
+
+export function axisLabel(a: 0 | 1 | 2): string {
+  return AXIS_LABEL[a]
+}
+
+/** Разницы всех кромок выделенной детали A относительно опорной B (6 значений). */
+export function edgeDiffs(A: AABB, B: AABB): EdgeDiff[] {
+  const out: EdgeDiff[] = []
+  for (let a = 0 as 0 | 1 | 2; a < 3; a = (a + 1) as 0 | 1 | 2) {
+    for (const kind of ['min', 'max'] as const) {
+      const d = A[kind][a] - B[kind][a]
+      out.push({ axis: a, kind, value: Math.abs(d), sign: d >= 0 ? 1 : -1 })
+    }
+  }
+  return out
+}
+
+/** Новая позиция детали primary, чтобы размер/разница kind стали равны newValue. */
+export function applyPairDim(
+  primary: Part,
+  secondary: Part,
+  materials: Material[],
+  axis: 0 | 1 | 2,
+  kind: DimKind,
+  sign: 1 | -1,
+  newValue: number,
+): Vec3 {
+  const A = aabbOf(primary, materials)
+  const B = aabbOf(secondary, materials)
+  const half = A.size[axis] / 2
+  const pos: Vec3 = [...primary.position] as Vec3
+  if (kind === 'gap') {
+    pos[axis] = sign < 0 ? B.min[axis] - newValue - half : B.max[axis] + newValue + half
+  } else if (kind === 'min') {
+    pos[axis] = B.min[axis] + sign * newValue + half
+  } else {
+    pos[axis] = B.max[axis] + sign * newValue - half
+  }
+  return pos
 }
 
 /**
@@ -108,7 +160,9 @@ export function computePairDims(A: AABB, B: AABB): PairDim[] {
     rb: number,
     rc: number,
     offsetBase: number,
-    kind: 'gap' | 'edge',
+    kind: DimKind,
+    value: number,
+    sign: 1 | -1,
   ) => {
     const b = ((axis + 1) % 3) as 0 | 1 | 2
     const c = ((axis + 2) % 3) as 0 | 1 | 2
@@ -123,7 +177,7 @@ export function computePairDims(A: AABB, B: AABB): PairDim[] {
     const offsetAxis = (axis === 1 ? 0 : 1) as 0 | 1 | 2
     const unionMax = Math.max(A.max[offsetAxis], B.max[offsetAxis])
     const offset = unionMax + offsetBase - start[offsetAxis]
-    dims.push({ axis, start, end, offsetAxis, offset, value: Math.abs(p2 - p1), kind })
+    dims.push({ axis, start, end, offsetAxis, offset, value, kind, sign })
   }
 
   // gap по оси расхождения — между обращёнными гранями
@@ -136,10 +190,10 @@ export function computePairDims(A: AABB, B: AABB): PairDim[] {
     const p2 = aLeft ? B.min[a] : A.min[a]
     const rb = (Math.max(A.min[b], B.min[b]) + Math.min(A.max[b], B.max[b])) / 2
     const rc = (Math.max(A.min[c], B.min[c]) + Math.min(A.max[c], B.max[c])) / 2
-    pushDim(a, p1, p2, rb, rc, 40, 'gap')
+    pushDim(a, p1, p2, rb, rc, 40, 'gap', Math.abs(p2 - p1), aLeft ? -1 : 1)
   }
 
-  // edge — разница кромок по остальным осям
+  // edge — разница кромок по остальным осям (показываем ненулевые)
   let stagger = 80
   for (let a = 0 as 0 | 1 | 2; a < 3; a = (a + 1) as 0 | 1 | 2) {
     if (a === sep) continue
@@ -150,8 +204,9 @@ export function computePairDims(A: AABB, B: AABB): PairDim[] {
     for (const edge of ['min', 'max'] as const) {
       const p1 = A[edge][a]
       const p2 = B[edge][a]
-      if (Math.abs(p1 - p2) <= 1) continue
-      pushDim(a, p1, p2, rb, rc, stagger, 'edge')
+      const d = p1 - p2
+      if (Math.abs(d) <= 1) continue
+      pushDim(a, p1, p2, rb, rc, stagger, edge, Math.abs(d), d >= 0 ? 1 : -1)
       stagger += 55
     }
   }

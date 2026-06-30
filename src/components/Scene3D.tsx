@@ -6,7 +6,7 @@ import { useProjectStore } from '../store/useProjectStore'
 import { useUiStore } from '../store/useUiStore'
 import { MM, partSize, projectBounds, thicknessOf } from '../lib/geometry'
 import { aabbOf, snapToFaces } from '../lib/snap'
-import { applyDim, computeDims, computePairDims, type PairDim } from '../lib/dimensions'
+import { applyDim, applyPairDim, computeDims, computePairDims, type PairDim } from '../lib/dimensions'
 import type { Material, Part, Vec3 } from '../types'
 
 const FACE_SNAP_THRESHOLD = 25 // мм, радиус притяжения граней
@@ -165,7 +165,23 @@ function arrowRot(axis: 0 | 1 | 2, sign: number): [number, number, number] {
   return [sign > 0 ? Math.PI / 2 : -Math.PI / 2, 0, 0]
 }
 
-function Dim({ dim }: { dim: PairDim }) {
+function Dim({
+  dim,
+  editing,
+  text,
+  onStart,
+  onText,
+  onCommit,
+  onCancel,
+}: {
+  dim: PairDim
+  editing: boolean
+  text: string
+  onStart: () => void
+  onText: (s: string) => void
+  onCommit: () => void
+  onCancel: () => void
+}) {
   const { axis, start, end, offsetAxis, offset, value, kind } = dim
   const toM = (p: Vec3): [number, number, number] => [p[0] * MM, p[1] * MM, p[2] * MM]
   const off = (p: Vec3): [number, number, number] => {
@@ -195,8 +211,32 @@ function Dim({ dim }: { dim: PairDim }) {
         <coneGeometry args={[0.005, 0.018, 12]} />
         <meshBasicMaterial color={color} />
       </mesh>
-      <Html position={mid} center zIndexRange={[25, 0]} style={{ pointerEvents: 'none' }}>
-        <div className={'dim-draft' + (kind === 'edge' ? ' edge' : '')}>{Math.round(value)}</div>
+      <Html position={mid} center zIndexRange={[26, 0]}>
+        {editing ? (
+          <input
+            className="dim-input"
+            autoFocus
+            inputMode="decimal"
+            value={text}
+            onChange={(e) => onText(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') onCommit()
+              else if (e.key === 'Escape') onCancel()
+            }}
+            onBlur={onCommit}
+          />
+        ) : (
+          <button
+            className={'dim-draft' + (kind !== 'gap' ? ' edge' : '')}
+            title="Кликни и введи размер"
+            onPointerDown={(e) => {
+              e.stopPropagation()
+              onStart()
+            }}
+          >
+            {Math.round(value)}
+          </button>
+        )}
       </Html>
     </group>
   )
@@ -213,15 +253,44 @@ function PairDimensions({
   selectedId: string | null
   secondaryId: string | null
 }) {
+  const updatePart = useProjectStore((s) => s.updatePart)
+  const beginInteraction = useProjectStore((s) => s.beginInteraction)
+  const [editKey, setEditKey] = useState<string | null>(null)
+  const [text, setText] = useState('')
+
   const A = selectedId ? parts.find((p) => p.id === selectedId) : undefined
   const B = secondaryId ? parts.find((p) => p.id === secondaryId) : undefined
   if (!A || !B) return null
   const dims = computePairDims(aabbOf(A, materials), aabbOf(B, materials))
+
   return (
     <>
-      {dims.map((d, i) => (
-        <Dim key={i} dim={d} />
-      ))}
+      {dims.map((d) => {
+        const key = `${d.axis}:${d.kind}`
+        return (
+          <Dim
+            key={key}
+            dim={d}
+            editing={editKey === key}
+            text={text}
+            onStart={() => {
+              setText(String(Math.round(d.value)))
+              setEditKey(key)
+            }}
+            onText={setText}
+            onCancel={() => setEditKey(null)}
+            onCommit={() => {
+              const v = parseFloat(text)
+              setEditKey(null)
+              if (!isFinite(v)) return
+              beginInteraction()
+              updatePart(A.id, {
+                position: applyPairDim(A, B, materials, d.axis, d.kind, d.sign, v),
+              })
+            }}
+          />
+        )
+      })}
     </>
   )
 }

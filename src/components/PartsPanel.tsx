@@ -2,6 +2,7 @@ import { useProjectStore } from '../store/useProjectStore'
 import { thicknessOf } from '../lib/geometry'
 import { PRESETS, presetPart } from '../lib/presets'
 import PartEditor from './PartEditor'
+import PairEdgeTable from './PairEdgeTable'
 import SnapSettings from './SnapSettings'
 
 export default function PartsPanel() {
@@ -81,6 +82,8 @@ export default function PartsPanel() {
           )
         })}
       </div>
+
+      {secondaryId && <PairEdgeTable />}
 
       {selected && (
         <div className="editor-wrap">
