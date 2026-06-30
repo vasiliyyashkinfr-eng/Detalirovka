@@ -1,0 +1,79 @@
+import { useEffect, useState } from 'react'
+import Scene3D from './components/Scene3D'
+import TopBar from './components/TopBar'
+import PartsPanel from './components/PartsPanel'
+import CutListTable from './components/CutListTable'
+import MaterialsPanel from './components/MaterialsPanel'
+import CabinetDialog from './components/CabinetDialog'
+import { useProjectStore } from './store/useProjectStore'
+import { lastProjectId, loadProject } from './lib/persistence'
+import { migrateProject } from './lib/persistence'
+
+type Tab = 'parts' | 'cutlist' | 'materials'
+
+export default function App() {
+  const [tab, setTab] = useState<Tab>('parts')
+  const [genOpen, setGenOpen] = useState(false)
+  const [loaded, setLoaded] = useState(false)
+  const setProject = useProjectStore((s) => s.setProject)
+
+  // Восстановление последнего проекта из IndexedDB.
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      try {
+        const id = await lastProjectId()
+        if (id && !cancelled) {
+          const p = await loadProject(id)
+          if (p && !cancelled) {
+            setProject(migrateProject(p))
+            setTimeout(() => window.dispatchEvent(new Event('fitView')), 100)
+          }
+        }
+      } finally {
+        if (!cancelled) setLoaded(true)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [setProject])
+
+  // Горячие клавиши undo/redo.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
+        e.preventDefault()
+        if (e.shiftKey) useProjectStore.getState().redo()
+        else useProjectStore.getState().undo()
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
+
+  return (
+    <div className="app">
+      <TopBar onOpenGenerator={() => setGenOpen(true)} />
+      <div className="content">
+        <div className="canvas-area">
+          {loaded && <Scene3D />}
+          <div className="canvas-hint">ЛКМ — выбрать деталь · перетягивай за стрелки · колесо/жест — zoom</div>
+        </div>
+        <aside className="side-panel">
+          <nav className="tabs">
+            <button className={tab === 'parts' ? 'active' : ''} onClick={() => setTab('parts')}>Детали</button>
+            <button className={tab === 'cutlist' ? 'active' : ''} onClick={() => setTab('cutlist')}>Деталировка</button>
+            <button className={tab === 'materials' ? 'active' : ''} onClick={() => setTab('materials')}>Материалы</button>
+          </nav>
+          <div className="tab-content">
+            {tab === 'parts' && <PartsPanel />}
+            {tab === 'cutlist' && <CutListTable />}
+            {tab === 'materials' && <MaterialsPanel />}
+          </div>
+        </aside>
+      </div>
+      {genOpen && <CabinetDialog onClose={() => setGenOpen(false)} />}
+    </div>
+  )
+}
