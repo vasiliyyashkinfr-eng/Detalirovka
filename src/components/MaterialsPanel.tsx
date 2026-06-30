@@ -1,6 +1,7 @@
 import { useProjectStore } from '../store/useProjectStore'
 import { createMaterial } from '../lib/factory'
 import type { MaterialKind } from '../types'
+import NumberField from './NumberField'
 
 const KINDS: MaterialKind[] = ['LDSP', 'MDF', 'HDF', 'DSP', 'PLY', 'OTHER']
 
@@ -41,7 +42,7 @@ export default function MaterialsPanel() {
                   </select>
                 </label>
                 <label className="tiny">Толщ., мм
-                  <input type="number" value={m.thickness} onChange={(e) => updateMaterial(m.id, { thickness: Number(e.target.value) })} />
+                  <NumberField value={m.thickness} onChange={(n) => updateMaterial(m.id, { thickness: n })} min={1} />
                 </label>
                 <div className="tiny end">
                   <span className="muted">{used > 0 ? `${used} дет.` : 'не исп.'}</span>

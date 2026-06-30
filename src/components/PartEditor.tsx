@@ -1,5 +1,6 @@
 import { useProjectStore } from '../store/useProjectStore'
 import type { EdgeThickness, Orientation, Part } from '../types'
+import NumberField from './NumberField'
 
 const ORIENTATIONS: { value: Orientation; label: string }[] = [
   { value: 'flat', label: 'Плашмя (дно/полка)' },
@@ -51,13 +52,13 @@ export default function PartEditor({ part }: { part: Part }) {
 
       <div className="grid2">
         <label>Длина, мм
-          <input type="number" value={part.length} onChange={(e) => set({ length: Number(e.target.value) })} />
+          <NumberField value={part.length} onChange={(n) => set({ length: n })} min={1} />
         </label>
         <label>Ширина, мм
-          <input type="number" value={part.width} onChange={(e) => set({ width: Number(e.target.value) })} />
+          <NumberField value={part.width} onChange={(n) => set({ width: n })} min={1} />
         </label>
         <label>Кол-во
-          <input type="number" min={1} value={part.qty} onChange={(e) => set({ qty: Math.max(1, Number(e.target.value)) })} />
+          <NumberField value={part.qty} onChange={(n) => set({ qty: n })} min={1} />
         </label>
         <label>Материал
           <select value={part.materialId} onChange={(e) => set({ materialId: e.target.value })}>
@@ -97,9 +98,9 @@ export default function PartEditor({ part }: { part: Part }) {
       <div className="field-group">
         <div className="field-label">Позиция центра, мм (X / Y / Z)</div>
         <div className="grid3">
-          <input type="number" value={Math.round(part.position[0])} onChange={(e) => setPos(0, Number(e.target.value))} />
-          <input type="number" value={Math.round(part.position[1])} onChange={(e) => setPos(1, Number(e.target.value))} />
-          <input type="number" value={Math.round(part.position[2])} onChange={(e) => setPos(2, Number(e.target.value))} />
+          <NumberField value={Math.round(part.position[0])} onChange={(n) => setPos(0, n)} />
+          <NumberField value={Math.round(part.position[1])} onChange={(n) => setPos(1, n)} />
+          <NumberField value={Math.round(part.position[2])} onChange={(n) => setPos(2, n)} />
         </div>
       </div>
 

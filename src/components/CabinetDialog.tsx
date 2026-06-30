@@ -1,7 +1,8 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useProjectStore } from '../store/useProjectStore'
 import { DEFAULT_CABINET, type CabinetParams } from '../lib/cabinet'
 import type { EdgeThickness } from '../types'
+import NumberField from './NumberField'
 
 export default function CabinetDialog({ onClose }: { onClose: () => void }) {
   const project = useProjectStore((s) => s.project)
@@ -13,8 +14,12 @@ export default function CabinetDialog({ onClose }: { onClose: () => void }) {
     backMaterialId: carcassMats[carcassMats.length - 1]?.id ?? DEFAULT_CABINET.backMaterialId,
   })
 
-  const num = (k: keyof CabinetParams) => (e: React.ChangeEvent<HTMLInputElement>) =>
-    setP((s) => ({ ...s, [k]: Number(e.target.value) }))
+  const setNum = (k: keyof CabinetParams) => (n: number) =>
+    setP((s) => ({ ...s, [k]: n }))
+
+  // Закрываем только если нажатие И отпускание произошли на самом фоне.
+  // Иначе выделение текста в поле с отпусканием за модалкой ложно закрывает её.
+  const downOnBackdrop = useRef(false)
 
   const submit = (mode: 'replace' | 'append') => {
     generate(p, mode)
@@ -23,8 +28,17 @@ export default function CabinetDialog({ onClose }: { onClose: () => void }) {
   }
 
   return (
-    <div className="modal-backdrop" onClick={onClose}>
-      <div className="modal" onClick={(e) => e.stopPropagation()}>
+    <div
+      className="modal-backdrop"
+      onPointerDown={(e) => {
+        downOnBackdrop.current = e.target === e.currentTarget
+      }}
+      onPointerUp={(e) => {
+        if (downOnBackdrop.current && e.target === e.currentTarget) onClose()
+        downOnBackdrop.current = false
+      }}
+    >
+      <div className="modal">
         <h2>Генератор корпуса</h2>
         <p className="muted">Задай габариты — детали раскинутся автоматически, потом их можно двигать и править.</p>
 
@@ -33,19 +47,19 @@ export default function CabinetDialog({ onClose }: { onClose: () => void }) {
             <input value={p.name} onChange={(e) => setP((s) => ({ ...s, name: e.target.value }))} />
           </label>
           <label>Толщина ЛДСП, мм
-            <input type="number" value={p.thickness} onChange={num('thickness')} />
+            <NumberField value={p.thickness} onChange={setNum('thickness')} min={1} />
           </label>
           <label>Ширина (Ш), мм
-            <input type="number" value={p.width} onChange={num('width')} />
+            <NumberField value={p.width} onChange={setNum('width')} min={1} />
           </label>
           <label>Высота (В), мм
-            <input type="number" value={p.height} onChange={num('height')} />
+            <NumberField value={p.height} onChange={setNum('height')} min={1} />
           </label>
           <label>Глубина (Г), мм
-            <input type="number" value={p.depth} onChange={num('depth')} />
+            <NumberField value={p.depth} onChange={setNum('depth')} min={1} />
           </label>
           <label>Полок, шт
-            <input type="number" min={0} value={p.shelves} onChange={num('shelves')} />
+            <NumberField value={p.shelves} onChange={setNum('shelves')} min={0} />
           </label>
           <label>Материал корпуса
             <select value={p.materialId} onChange={(e) => setP((s) => ({ ...s, materialId: e.target.value }))}>
