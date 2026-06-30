@@ -44,7 +44,7 @@ export default function TopBar({ onOpenGenerator }: { onOpenGenerator: () => voi
         spellCheck={false}
       />
       <div className="topbar-actions">
-        <button className="btn primary" onClick={onOpenGenerator}>Корпус…</button>
+        <button className="btn primary" onClick={onOpenGenerator}>Корпус</button>
         <button className="btn" title="Вписать вид" onClick={() => window.dispatchEvent(new Event('fitView'))}>⤢</button>
         <button className="btn" disabled={!canUndo} onClick={undo} title="Отменить">↶</button>
         <button className="btn" disabled={!canRedo} onClick={redo} title="Повторить">↷</button>

@@ -1,7 +1,7 @@
 import { create } from 'zustand'
-import type { Material, Part, Project, Vec3 } from '../types'
+import type { CabinetParams, Material, Part, Project, Vec3 } from '../types'
 import { createPart, createProject } from '../lib/factory'
-import { generateCabinet, type CabinetParams } from '../lib/cabinet'
+import { generateCabinet } from '../lib/cabinet'
 import { saveProject } from '../lib/persistence'
 import { partSize, projectBounds, thicknessOf } from '../lib/geometry'
 
@@ -33,8 +33,9 @@ interface ProjectStore {
   addMaterial: (m: Material) => void
   updateMaterial: (id: string, patch: Partial<Material>) => void
   removeMaterial: (id: string) => void
-  // cabinet generator
-  generate: (params: CabinetParams, mode: 'replace' | 'append') => void
+  // параметрический корпус
+  setCabinet: (params: CabinetParams) => void
+  removeCabinet: () => void
   // history
   beginInteraction: () => void
   undo: () => void
@@ -187,14 +188,24 @@ export const useProjectStore = create<ProjectStore>((set, get) => {
         return { ...p, materials: p.materials.filter((x) => x.id !== id) }
       }),
 
-    generate: (params, mode) =>
+    // Создать/пересобрать параметрический корпус. Сгенерированные детали
+    // заменяются целиком, ручные (без флага generated) сохраняются.
+    setCabinet: (params) => {
       commit((p) => {
-        const generated = generateCabinet(params)
-        return {
-          ...p,
-          parts: mode === 'replace' ? generated : [...p.parts, ...generated],
-        }
-      }),
+        const manual = p.parts.filter((x) => !x.generated)
+        const carcass = generateCabinet(params)
+        return { ...p, cabinet: params, parts: [...carcass, ...manual] }
+      })
+      // Если выделённая деталь была частью корпуса — снять выделение.
+      const sel = get().selectedId
+      if (sel && !get().project.parts.some((x) => x.id === sel)) set({ selectedId: null })
+    },
+
+    removeCabinet: () => {
+      commit((p) => ({ ...p, cabinet: undefined, parts: p.parts.filter((x) => !x.generated) }))
+      const sel = get().selectedId
+      if (sel && !get().project.parts.some((x) => x.id === sel)) set({ selectedId: null })
+    },
 
     // Снимок состояния перед началом интерактивного действия (drag),
     // чтобы вся серия движений откатывалась одним undo.

@@ -80,6 +80,35 @@ export interface Part {
   position: Vec3
   colorOverride?: string
   holes?: DrillHole[]
+  // true — деталь сгенерирована параметрическим корпусом (пересобирается при
+  // изменении габаритов). Ручные детали этот флаг не имеют.
+  generated?: boolean
+}
+
+/** Конструктив крыши: вкладная между боковинами / накладная сверху. */
+export type TopMode = 'inset' | 'overlay'
+/** Конструктив дна: вкладное между боковинами / боковины стоят на дне. */
+export type BottomMode = 'inset' | 'sides-on-bottom'
+
+export interface CabinetParams {
+  name: string
+  width: number // Ш, мм (X)
+  height: number // В, мм (Y)
+  depth: number // Г, мм (Z); при наличии фасада включает его толщину и зазор
+  thickness: number // толщина ЛДСП корпуса, мм
+  backThickness: number // толщина задней стенки, мм
+  shelves: number // количество полок
+  hasBack: boolean
+  hasTop: boolean
+  topMode: TopMode
+  bottomMode: BottomMode
+  facade: boolean // учитывать фасад
+  facadeThickness: number // толщина фасада, мм
+  facadeGap: number // зазор между фасадом и корпусом, мм
+  materialId: string
+  backMaterialId: string
+  facadeMaterialId: string
+  frontEdge: EdgeThickness
 }
 
 export interface Project {
@@ -90,6 +119,8 @@ export interface Project {
   updatedAt: number
   materials: Material[]
   parts: Part[]
+  // Параметры параметрического корпуса (если создан).
+  cabinet?: CabinetParams
 }
 
 export const SCHEMA_VERSION = 1

@@ -4,17 +4,16 @@ import TopBar from './components/TopBar'
 import PartsPanel from './components/PartsPanel'
 import CutListTable from './components/CutListTable'
 import MaterialsPanel from './components/MaterialsPanel'
-import CabinetDialog from './components/CabinetDialog'
+import CabinetPanel from './components/CabinetPanel'
 import { useProjectStore } from './store/useProjectStore'
 import { useUiStore } from './store/useUiStore'
 import { lastProjectId, loadProject } from './lib/persistence'
 import { migrateProject } from './lib/persistence'
 
-type Tab = 'parts' | 'cutlist' | 'materials'
+type Tab = 'cabinet' | 'parts' | 'cutlist' | 'materials'
 
 export default function App() {
-  const [tab, setTab] = useState<Tab>('parts')
-  const [genOpen, setGenOpen] = useState(false)
+  const [tab, setTab] = useState<Tab>('cabinet')
   const [loaded, setLoaded] = useState(false)
   const setProject = useProjectStore((s) => s.setProject)
 
@@ -75,7 +74,7 @@ export default function App() {
 
   return (
     <div className="app">
-      <TopBar onOpenGenerator={() => setGenOpen(true)} />
+      <TopBar onOpenGenerator={() => setTab('cabinet')} />
       <div className="content">
         <div className="canvas-area">
           {loaded && <Scene3D />}
@@ -83,18 +82,19 @@ export default function App() {
         </div>
         <aside className="side-panel">
           <nav className="tabs">
+            <button className={tab === 'cabinet' ? 'active' : ''} onClick={() => setTab('cabinet')}>Корпус</button>
             <button className={tab === 'parts' ? 'active' : ''} onClick={() => setTab('parts')}>Детали</button>
             <button className={tab === 'cutlist' ? 'active' : ''} onClick={() => setTab('cutlist')}>Деталировка</button>
             <button className={tab === 'materials' ? 'active' : ''} onClick={() => setTab('materials')}>Материалы</button>
           </nav>
           <div className="tab-content">
+            {tab === 'cabinet' && <CabinetPanel />}
             {tab === 'parts' && <PartsPanel />}
             {tab === 'cutlist' && <CutListTable />}
             {tab === 'materials' && <MaterialsPanel />}
           </div>
         </aside>
       </div>
-      {genOpen && <CabinetDialog onClose={() => setGenOpen(false)} />}
     </div>
   )
 }
