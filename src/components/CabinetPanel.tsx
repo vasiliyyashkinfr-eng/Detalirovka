@@ -103,6 +103,16 @@ export default function CabinetPanel() {
             Фасад
           </label>
         </div>
+        {p.hasBack && (
+          <div className="grid2">
+            <label>Толщина ДВП, мм
+              <NumberField value={p.backThickness} onChange={(n) => upd({ backThickness: n })} min={1} />
+            </label>
+            <label>ДВП меньше корпуса на, мм
+              <NumberField value={p.backReduction ?? 5} onChange={(n) => upd({ backReduction: n })} min={0} />
+            </label>
+          </div>
+        )}
         {p.facade && (
           <>
             <p className="muted tiny">В глубину (Г) входит фасад и зазор; глубина корпуса = Г − {p.facadeThickness} − {p.facadeGap} мм.</p>

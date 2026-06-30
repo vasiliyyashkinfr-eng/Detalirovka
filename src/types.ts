@@ -97,6 +97,7 @@ export interface CabinetParams {
   depth: number // Г, мм (Z); при наличии фасада включает его толщину и зазор
   thickness: number // толщина ЛДСП корпуса, мм
   backThickness: number // толщина задней стенки, мм
+  backReduction: number // на сколько ДВП меньше корпуса по Ш и В, мм
   shelves: number // количество полок
   hasBack: boolean
   hasTop: boolean

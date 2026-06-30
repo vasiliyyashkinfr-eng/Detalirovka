@@ -67,7 +67,10 @@ export function validateProject(data: unknown): data is Project {
 }
 
 export function migrateProject(project: Project): Project {
-  // Зарезервировано под будущие версии схемы.
   if (!project.schemaVersion) project.schemaVersion = SCHEMA_VERSION
+  // Корпуса из ранней параметрической версии не имели backReduction.
+  if (project.cabinet && project.cabinet.backReduction == null) {
+    project.cabinet = { ...project.cabinet, backReduction: 5 }
+  }
   return project
 }

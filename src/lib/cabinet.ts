@@ -9,6 +9,7 @@ export const DEFAULT_CABINET: CabinetParams = {
   depth: 320,
   thickness: 18,
   backThickness: 3,
+  backReduction: 5,
   shelves: 2,
   hasBack: true,
   hasTop: true,
@@ -132,19 +133,23 @@ export function generateCabinet(p: CabinetParams): Part[] {
     )
   }
 
-  // Задняя стенка (накладная сзади)
+  // Задняя стенка (ДВП, накладная сзади). Меньше корпуса на backReduction
+  // по ширине и высоте; вынесена за заднюю плоскость корпуса с микро-зазором,
+  // чтобы её грани не совпадали с задними гранями боковин (иначе z-fighting).
   if (p.hasBack) {
+    const red = Math.max(0, p.backReduction ?? 5)
+    const BACK_CLEARANCE = 0.5 // мм, незаметный зазор против мерцания граней
     parts.push(
       part({
-        name: 'Задняя стенка',
+        name: 'Задняя стенка (ДВП)',
         role: 'back',
         materialId: p.backMaterialId,
-        length: W,
-        width: H,
+        length: Math.max(50, W - red),
+        width: Math.max(50, H - red),
         orientation: 'front-back',
         edges: emptyEdges(),
         grain: 'none',
-        position: [0, H / 2, -Dc / 2 + tb / 2],
+        position: [0, H / 2, -Dc / 2 - tb / 2 - BACK_CLEARANCE],
       }),
     )
   }

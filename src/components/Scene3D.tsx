@@ -183,6 +183,7 @@ export default function Scene3D() {
     <Canvas
       shadows
       dpr={[1, 2]}
+      gl={{ logarithmicDepthBuffer: true }}
       camera={{ position: [1.2, 1, 1.4], fov: 45, near: 0.01, far: 100 }}
       onPointerMissed={() => select(null)}
       style={{ touchAction: 'none' }}
