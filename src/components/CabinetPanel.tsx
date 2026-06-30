@@ -8,32 +8,36 @@ export default function CabinetPanel() {
   const project = useProjectStore((s) => s.project)
   const setCabinet = useProjectStore((s) => s.setCabinet)
   const removeCabinet = useProjectStore((s) => s.removeCabinet)
+  const clearParts = useProjectStore((s) => s.clearParts)
   const mats = project.materials
+  const [replaceExisting, setReplaceExisting] = useState(true)
 
   const exists = !!project.cabinet
-  const [draft, setDraft] = useState<CabinetParams>(
-    () =>
-      project.cabinet ?? {
-        ...DEFAULT_CABINET,
-        materialId: mats[0]?.id ?? DEFAULT_CABINET.materialId,
-        backMaterialId: mats[mats.length - 1]?.id ?? DEFAULT_CABINET.backMaterialId,
-        facadeMaterialId: mats[0]?.id ?? DEFAULT_CABINET.facadeMaterialId,
-      },
-  )
+  // Черновик нужен только пока корпуса нет (форма «Создать корпус»).
+  // Когда корпус существует — источник истины это project.cabinet,
+  // поэтому форма всегда отражает актуальные параметры (в т.ч. после загрузки/undo).
+  const [draft, setDraft] = useState<CabinetParams>(() => ({
+    ...DEFAULT_CABINET,
+    materialId: mats[0]?.id ?? DEFAULT_CABINET.materialId,
+    backMaterialId: mats[mats.length - 1]?.id ?? DEFAULT_CABINET.backMaterialId,
+    facadeMaterialId: mats[0]?.id ?? DEFAULT_CABINET.facadeMaterialId,
+  }))
 
-  // Правка параметра: пока корпуса нет — копим локально; когда есть — live-пересборка.
+  const p = project.cabinet ?? draft
+
+  // Правка параметра: есть корпус — сразу пересобираем; нет — копим в черновик.
   const upd = (patch: Partial<CabinetParams>) => {
-    const next = { ...draft, ...patch }
-    setDraft(next)
-    if (exists) setCabinet(next)
+    if (project.cabinet) setCabinet({ ...project.cabinet, ...patch })
+    else setDraft((d) => ({ ...d, ...patch }))
   }
 
   const create = () => {
+    // Если в проекте уже есть детали (напр. корпус из старой версии) —
+    // по умолчанию заменяем их новым параметрическим корпусом.
+    if (replaceExisting && project.parts.length > 0) clearParts()
     setCabinet(draft)
     window.dispatchEvent(new Event('fitView'))
   }
-
-  const p = draft
 
   return (
     <div className="panel-body">
@@ -155,7 +159,19 @@ export default function CabinetPanel() {
           </button>
         </div>
       ) : (
-        <button className="btn primary" onClick={create}>Создать корпус</button>
+        <div className="field-group">
+          {project.parts.length > 0 && (
+            <label className="check">
+              <input
+                type="checkbox"
+                checked={replaceExisting}
+                onChange={(e) => setReplaceExisting(e.target.checked)}
+              />
+              Заменить текущие детали ({project.parts.length} шт) новым корпусом
+            </label>
+          )}
+          <button className="btn primary" onClick={create}>Создать корпус</button>
+        </div>
       )}
     </div>
   )
