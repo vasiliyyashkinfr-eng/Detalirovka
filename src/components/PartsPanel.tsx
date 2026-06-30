@@ -1,5 +1,6 @@
 import { useProjectStore } from '../store/useProjectStore'
 import { thicknessOf } from '../lib/geometry'
+import { PRESETS, presetPart } from '../lib/presets'
 import PartEditor from './PartEditor'
 import SnapSettings from './SnapSettings'
 
@@ -8,6 +9,7 @@ export default function PartsPanel() {
   const selectedId = useProjectStore((s) => s.selectedId)
   const select = useProjectStore((s) => s.select)
   const addPart = useProjectStore((s) => s.addPart)
+  const duplicatePart = useProjectStore((s) => s.duplicatePart)
   const clearParts = useProjectStore((s) => s.clearParts)
 
   const selected = project.parts.find((p) => p.id === selectedId)
@@ -15,8 +17,17 @@ export default function PartsPanel() {
   return (
     <div className="panel-body">
       <SnapSettings />
-      <div className="row gap wrap">
-        <button className="btn primary" onClick={() => addPart()}>+ Деталь</button>
+
+      <div className="add-row">
+        {PRESETS.map((preset) => (
+          <button
+            key={preset.kind}
+            className={'btn' + (preset.kind === 'custom' ? ' primary' : '')}
+            onClick={() => addPart(presetPart(preset.kind, project.cabinet, project.materials))}
+          >
+            {preset.label}
+          </button>
+        ))}
         {project.parts.length > 0 && (
           <button className="btn danger" onClick={() => { if (confirm('Удалить все детали?')) clearParts() }}>
             Очистить
@@ -26,19 +37,29 @@ export default function PartsPanel() {
 
       <div className="parts-list">
         {project.parts.length === 0 && (
-          <p className="muted center">Деталей пока нет. Сгенерируй корпус или добавь деталь вручную.</p>
+          <p className="muted center">Деталей пока нет. Создай корпус или добавь деталь кнопками выше.</p>
         )}
         {project.parts.map((p) => {
           const th = thicknessOf(p, project.materials)
           return (
-            <button
+            <div
               key={p.id}
               className={'part-item' + (p.id === selectedId ? ' active' : '')}
               onClick={() => select(p.id)}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => { if (e.key === 'Enter') select(p.id) }}
             >
               <span className="part-name">{p.name}</span>
               <span className="part-dims">{p.length}×{p.width}×{th}{p.qty > 1 ? ` · ${p.qty}шт` : ''}</span>
-            </button>
+              <button
+                className="part-copy"
+                title="Дублировать деталь"
+                onClick={(e) => { e.stopPropagation(); duplicatePart(p.id) }}
+              >
+                ⧉
+              </button>
+            </div>
           )
         })}
       </div>

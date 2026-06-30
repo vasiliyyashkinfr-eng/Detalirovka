@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Canvas, useThree } from '@react-three/fiber'
-import { Edges, GizmoHelper, GizmoViewport, Grid, OrbitControls, TransformControls } from '@react-three/drei'
+import { Edges, GizmoHelper, GizmoViewport, Grid, Html, OrbitControls, TransformControls } from '@react-three/drei'
 import * as THREE from 'three'
 import { useProjectStore } from '../store/useProjectStore'
 import { useUiStore } from '../store/useUiStore'
@@ -45,6 +45,34 @@ function PartMesh({
       />
       <Edges threshold={15} color={selected ? '#60a5fa' : '#5b6770'} />
     </mesh>
+  )
+}
+
+function SelectionLabel({
+  parts,
+  materials,
+  selectedId,
+}: {
+  parts: Part[]
+  materials: Material[]
+  selectedId: string | null
+}) {
+  const sel = selectedId ? parts.find((p) => p.id === selectedId) : undefined
+  if (!sel) return null
+  const th = thicknessOf(sel, materials)
+  const sz = partSize(sel, th)
+  const top: [number, number, number] = [
+    sel.position[0] * MM,
+    (sel.position[1] + sz[1] / 2) * MM + 0.03,
+    sel.position[2] * MM,
+  ]
+  return (
+    <Html position={top} center distanceFactor={undefined} zIndexRange={[20, 0]} style={{ pointerEvents: 'none' }}>
+      <div className="part3d-label">
+        <b>{sel.name}</b>
+        <span>{sel.length}×{sel.width}×{th}</span>
+      </div>
+    </Html>
   )
 }
 
@@ -129,6 +157,8 @@ function SceneContent() {
           onSelect={select}
         />
       ))}
+
+      <SelectionLabel parts={parts} materials={materials} selectedId={selectedId} />
 
       {target && (
         <TransformControls

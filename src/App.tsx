@@ -49,12 +49,22 @@ export default function App() {
         return
       }
 
-      // Не перехватываем стрелки, когда фокус в поле ввода.
+      // Не перехватываем клавиши, когда фокус в поле ввода.
       const tag = (document.activeElement?.tagName ?? '').toLowerCase()
       if (tag === 'input' || tag === 'select' || tag === 'textarea') return
 
-      const { selectedId, nudgeSelected } = useProjectStore.getState()
+      const store = useProjectStore.getState()
+      const { selectedId, nudgeSelected } = store
       if (!selectedId) return
+
+      // Ctrl/Cmd+D — дублировать; Delete/Backspace — удалить выделенную деталь.
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'd') {
+        e.preventDefault(); store.duplicatePart(selectedId); return
+      }
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        e.preventDefault(); store.removePart(selectedId); return
+      }
+
       const step = useUiStore.getState().gridStep || 1
       // ←/→ — ось X; ↑/↓ — глубина Z; Shift+↑/↓ — высота Y.
       switch (e.key) {

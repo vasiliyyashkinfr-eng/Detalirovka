@@ -92,6 +92,24 @@ body {
   min-height: 0;
   background: var(--bg);
 }
+.part3d-label {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  background: rgba(15, 20, 25, .82);
+  border: 1px solid var(--accent-2);
+  border-radius: 7px;
+  padding: 4px 9px;
+  font-size: 12px;
+  line-height: 1.25;
+  white-space: nowrap;
+  color: #e6edf3;
+  transform: translateY(-50%);
+  user-select: none;
+}
+.part3d-label span { color: #9fb4cc; font-size: 11px; }
+
 .canvas-hint {
   position: absolute;
   left: 50%;
@@ -207,11 +225,14 @@ input[type=checkbox] { width: auto; }
 }
 .gap-field input { width: 70px; }
 
+/* ===== Add presets ===== */
+.add-row { display: flex; flex-wrap: wrap; gap: 6px; }
+.add-row .btn { flex: 1 1 auto; }
+
 /* ===== Parts list ===== */
 .parts-list { display: flex; flex-direction: column; gap: 4px; }
 .part-item {
   display: flex;
-  justify-content: space-between;
   align-items: center;
   gap: 8px;
   background: var(--panel-2);
@@ -224,8 +245,21 @@ input[type=checkbox] { width: auto; }
   font-size: 13px;
 }
 .part-item.active { border-color: var(--accent-2); background: #1d2b3f; }
-.part-name { font-weight: 500; }
+.part-name { font-weight: 500; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .part-dims { color: var(--muted); font-size: 12px; white-space: nowrap; }
+.part-copy {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  border-radius: 6px;
+  width: 26px;
+  height: 26px;
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  flex: none;
+}
+.part-copy:hover { border-color: var(--accent-2); color: var(--text); }
 
 .editor-wrap {
   border-top: 1px solid var(--border);
