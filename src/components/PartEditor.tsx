@@ -1,7 +1,14 @@
 import { useState } from 'react'
 import { useProjectStore } from '../store/useProjectStore'
-import { useUiStore } from '../store/useUiStore'
-import { aabbOf, placeRelative, RELATION_LABELS, type Relation } from '../lib/snap'
+import {
+  aabbOf,
+  DIRECTIONS,
+  MEASURES,
+  measureDistance,
+  positionByDistance,
+  type Direction,
+  type Measure,
+} from '../lib/snap'
 import type { EdgeThickness, Orientation, Part } from '../types'
 import NumberField from './NumberField'
 
@@ -47,11 +54,12 @@ export default function PartEditor({ part }: { part: Part }) {
   const removePart = useProjectStore((s) => s.removePart)
   const arrayDuplicate = useProjectStore((s) => s.arrayDuplicate)
   const beginInteraction = useProjectStore((s) => s.beginInteraction)
-  const gap = useUiStore((s) => s.gap)
 
   const others = project.parts.filter((x) => x.id !== part.id)
   const [targetId, setTargetId] = useState<string>('')
-  const [relation, setRelation] = useState<Relation>('right')
+  const [direction, setDirection] = useState<Direction>('up')
+  const [measure, setMeasure] = useState<Measure>('clear')
+  const [distance, setDistance] = useState(100)
   const [arrCount, setArrCount] = useState(2)
   const [arrAxis, setArrAxis] = useState<0 | 1 | 2>(0)
   const [arrStep, setArrStep] = useState(300)
@@ -64,12 +72,29 @@ export default function PartEditor({ part }: { part: Part }) {
   }
 
   const effectiveTargetId = targetId || others[0]?.id || ''
+  const targetPart = project.parts.find((x) => x.id === effectiveTargetId)
 
-  const applyRelative = () => {
-    const tgt = project.parts.find((x) => x.id === effectiveTargetId)
-    if (!tgt) return
+  // Текущее расстояние до опорной детали (для подсказки и кнопки «= текущее»).
+  const currentDistance =
+    targetPart != null
+      ? measureDistance(
+          aabbOf(part, project.materials),
+          aabbOf(targetPart, project.materials),
+          direction,
+          measure,
+        )
+      : 0
+
+  const applyDistance = () => {
+    if (!targetPart) return
     beginInteraction()
-    const pos = placeRelative(aabbOf(part, project.materials), aabbOf(tgt, project.materials), relation, gap)
+    const pos = positionByDistance(
+      aabbOf(part, project.materials),
+      aabbOf(targetPart, project.materials),
+      direction,
+      measure,
+      distance,
+    )
     set({ position: pos })
   }
 
@@ -144,20 +169,37 @@ export default function PartEditor({ part }: { part: Part }) {
 
       {others.length > 0 && (
         <div className="field-group">
-          <div className="field-label">Притянуть к детали (зазор берётся из настроек привязки: {gap} мм)</div>
+          <div className="field-label">Расстояние до детали</div>
+          <select value={effectiveTargetId} onChange={(e) => setTargetId(e.target.value)}>
+            {others.map((o) => (
+              <option key={o.id} value={o.id}>{o.name}</option>
+            ))}
+          </select>
           <div className="grid2">
-            <select value={effectiveTargetId} onChange={(e) => setTargetId(e.target.value)}>
-              {others.map((o) => (
-                <option key={o.id} value={o.id}>{o.name}</option>
-              ))}
-            </select>
-            <select value={relation} onChange={(e) => setRelation(e.target.value as Relation)}>
-              {RELATION_LABELS.map((r) => (
-                <option key={r.value} value={r.value}>{r.label}</option>
-              ))}
-            </select>
+            <label className="tiny">Направление
+              <select value={direction} onChange={(e) => setDirection(e.target.value as Direction)}>
+                {DIRECTIONS.map((d) => <option key={d.value} value={d.value}>{d.label}</option>)}
+              </select>
+            </label>
+            <label className="tiny">Измерять
+              <select value={measure} onChange={(e) => setMeasure(e.target.value as Measure)}>
+                {MEASURES.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
+              </select>
+            </label>
           </div>
-          <button className="btn" onClick={applyRelative}>Поставить</button>
+          <div className="row gap">
+            <label className="grow tiny">Расстояние, мм
+              <NumberField value={distance} onChange={setDistance} />
+            </label>
+            <button
+              className="btn small"
+              title="Подставить текущее расстояние"
+              onClick={() => setDistance(Math.round(currentDistance))}
+            >
+              = {Math.round(currentDistance)}
+            </button>
+          </div>
+          <button className="btn primary" onClick={applyDistance}>Поставить на расстояние</button>
         </div>
       )}
 

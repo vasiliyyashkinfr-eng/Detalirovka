@@ -69,60 +69,89 @@ export function snapToFaces(
   return result
 }
 
-export type Relation =
-  | 'left'
-  | 'right'
-  | 'below'
-  | 'above'
-  | 'front'
-  | 'back'
-  | 'alignX'
-  | 'alignY'
-  | 'alignZ'
+/** Направление расположения детали относительно опорной (куда смещаем). */
+export type Direction = 'up' | 'down' | 'right' | 'left' | 'front' | 'back'
 
-export const RELATION_LABELS: { value: Relation; label: string }[] = [
-  { value: 'left', label: 'Слева (X−)' },
-  { value: 'right', label: 'Справа (X+)' },
-  { value: 'below', label: 'Снизу (Y−)' },
-  { value: 'above', label: 'Сверху (Y+)' },
+/**
+ * Тип измерения расстояния:
+ *  - center — между осями (середина толщины ↔ середина толщины);
+ *  - clear  — в свету (между обращёнными друг к другу гранями/кромками);
+ *  - outer  — по внешним кромкам (общий габарит от внешней грани до внешней).
+ */
+export type Measure = 'center' | 'clear' | 'outer'
+
+export const DIRECTIONS: { value: Direction; label: string }[] = [
+  { value: 'up', label: 'Выше (Y+)' },
+  { value: 'down', label: 'Ниже (Y−)' },
+  { value: 'right', label: 'Правее (X+)' },
+  { value: 'left', label: 'Левее (X−)' },
   { value: 'front', label: 'Спереди (Z+)' },
   { value: 'back', label: 'Сзади (Z−)' },
-  { value: 'alignX', label: 'Центр по X' },
-  { value: 'alignY', label: 'Центр по Y' },
-  { value: 'alignZ', label: 'Центр по Z' },
 ]
 
-/** Позиция центра mover, поставленного относительно target с зазором gap. */
-export function placeRelative(mover: AABB, target: AABB, relation: Relation, gap: number): Vec3 {
+export const MEASURES: { value: Measure; label: string }[] = [
+  { value: 'clear', label: 'В свету (между кромками)' },
+  { value: 'center', label: 'По осям (центр–центр)' },
+  { value: 'outer', label: 'По внешним кромкам' },
+]
+
+const DIR: Record<Direction, { axis: 0 | 1 | 2; sign: 1 | -1 }> = {
+  right: { axis: 0, sign: 1 },
+  left: { axis: 0, sign: -1 },
+  up: { axis: 1, sign: 1 },
+  down: { axis: 1, sign: -1 },
+  front: { axis: 2, sign: 1 },
+  back: { axis: 2, sign: -1 },
+}
+
+/** Текущее расстояние между деталями в заданном направлении и типе измерения, мм. */
+export function measureDistance(
+  mover: AABB,
+  target: AABB,
+  direction: Direction,
+  measure: Measure,
+): number {
+  const { axis, sign } = DIR[direction]
+  const mc = mover.center[axis]
+  const hm = mover.size[axis] / 2
+  const tc = target.center[axis]
+  const th = target.size[axis] / 2
+  switch (measure) {
+    case 'center':
+      return sign * (mc - tc)
+    case 'clear':
+      return sign * (mc - sign * hm - (tc + sign * th))
+    case 'outer':
+      return sign * (mc + sign * hm - (tc - sign * th))
+  }
+}
+
+/**
+ * Позиция центра mover, поставленного на расстоянии value от target
+ * в направлении direction по выбранному типу измерения. Меняется только
+ * координата вдоль оси направления, остальные сохраняются.
+ */
+export function positionByDistance(
+  mover: AABB,
+  target: AABB,
+  direction: Direction,
+  measure: Measure,
+  value: number,
+): Vec3 {
+  const { axis, sign } = DIR[direction]
   const c: Vec3 = [...mover.center] as Vec3
-  const h = mover.size
-  switch (relation) {
-    case 'left':
-      c[0] = target.min[0] - gap - h[0] / 2
+  const hm = mover.size[axis] / 2
+  const tc = target.center[axis]
+  const th = target.size[axis] / 2
+  switch (measure) {
+    case 'center':
+      c[axis] = tc + sign * value
       break
-    case 'right':
-      c[0] = target.max[0] + gap + h[0] / 2
+    case 'clear':
+      c[axis] = tc + sign * (th + value + hm)
       break
-    case 'below':
-      c[1] = target.min[1] - gap - h[1] / 2
-      break
-    case 'above':
-      c[1] = target.max[1] + gap + h[1] / 2
-      break
-    case 'front':
-      c[2] = target.max[2] + gap + h[2] / 2
-      break
-    case 'back':
-      c[2] = target.min[2] - gap - h[2] / 2
-      break
-    case 'alignX':
-      c[0] = target.center[0]
-      break
-    case 'alignY':
-      c[1] = target.center[1]
-      break
-    case 'alignZ':
-      c[2] = target.center[2]
+    case 'outer':
+      c[axis] = tc + sign * (value - th - hm)
       break
   }
   return c
