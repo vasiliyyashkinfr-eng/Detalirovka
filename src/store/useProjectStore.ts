@@ -13,9 +13,11 @@ interface HistoryState {
 interface ProjectStore {
   project: Project
   selectedId: string | null
+  secondaryId: string | null // вторая деталь для измерения между двумя
   history: HistoryState
   // selection
   select: (id: string | null) => void
+  selectSecondary: (id: string | null) => void
   // project
   setProject: (project: Project) => void
   newProject: (name?: string) => void
@@ -71,15 +73,23 @@ export const useProjectStore = create<ProjectStore>((set, get) => {
   return {
     project: createProject(),
     selectedId: null,
+    secondaryId: null,
     history: { past: [], future: [] },
 
-    select: (id) => set({ selectedId: id }),
+    select: (id) =>
+      set((s) => ({
+        selectedId: id,
+        // снимаем вторичное, если выбрали ту же деталь или сбросили выделение
+        secondaryId: id === null || id === s.secondaryId ? null : s.secondaryId,
+      })),
+
+    selectSecondary: (id) => set({ secondaryId: id }),
 
     setProject: (project) =>
-      set({ project, selectedId: null, history: { past: [], future: [] } }),
+      set({ project, selectedId: null, secondaryId: null, history: { past: [], future: [] } }),
 
     newProject: (name) =>
-      set({ project: createProject(name), selectedId: null, history: { past: [], future: [] } }),
+      set({ project: createProject(name), selectedId: null, secondaryId: null, history: { past: [], future: [] } }),
 
     renameProject: (name) => commit((p) => ({ ...p, name })),
 
@@ -166,12 +176,14 @@ export const useProjectStore = create<ProjectStore>((set, get) => {
 
     removePart: (id) => {
       commit((p) => ({ ...p, parts: p.parts.filter((x) => x.id !== id) }))
-      if (get().selectedId === id) set({ selectedId: null })
+      const s = get()
+      if (s.selectedId === id) set({ selectedId: null })
+      if (s.secondaryId === id) set({ secondaryId: null })
     },
 
     clearParts: () => {
       commit((p) => ({ ...p, parts: [] }))
-      set({ selectedId: null })
+      set({ selectedId: null, secondaryId: null })
     },
 
     addMaterial: (m) => commit((p) => ({ ...p, materials: [...p.materials, m] })),

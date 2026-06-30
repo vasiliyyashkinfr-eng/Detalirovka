@@ -72,6 +72,93 @@ export function computeDims(
   return chips
 }
 
+export interface PairDim {
+  axis: 0 | 1 | 2
+  start: Vec3 // измеряемая точка 1 (на грани), мм
+  end: Vec3 // измеряемая точка 2 (на грани), мм — отличается от start только по [axis]
+  offsetAxis: 0 | 1 | 2 // ось, вдоль которой размерная линия вынесена наружу
+  offset: number // смещение размерной линии от измеряемых точек, мм (со знаком)
+  value: number // показываемое значение, мм
+  kind: 'gap' | 'edge'
+}
+
+/**
+ * Чертёжные размеры между двумя деталями:
+ *  - gap  — расстояние между обращёнными гранями по оси наибольшего расхождения;
+ *  - edge — разница соответствующих кромок (min/max) по остальным осям.
+ */
+export function computePairDims(A: AABB, B: AABB): PairDim[] {
+  const dims: PairDim[] = []
+
+  // ось наибольшего расхождения = наименьшее перекрытие
+  let sep: 0 | 1 | 2 = 0
+  let minOv = Infinity
+  for (let a = 0; a < 3; a++) {
+    const ov = Math.min(A.max[a], B.max[a]) - Math.max(A.min[a], B.min[a])
+    if (ov < minOv) {
+      minOv = ov
+      sep = a as 0 | 1 | 2
+    }
+  }
+
+  const pushDim = (
+    axis: 0 | 1 | 2,
+    p1: number,
+    p2: number,
+    rb: number,
+    rc: number,
+    offsetBase: number,
+    kind: 'gap' | 'edge',
+  ) => {
+    const b = ((axis + 1) % 3) as 0 | 1 | 2
+    const c = ((axis + 2) % 3) as 0 | 1 | 2
+    const start: Vec3 = [0, 0, 0]
+    const end: Vec3 = [0, 0, 0]
+    start[axis] = p1
+    end[axis] = p2
+    start[b] = rb
+    end[b] = rb
+    start[c] = rc
+    end[c] = rc
+    const offsetAxis = (axis === 1 ? 0 : 1) as 0 | 1 | 2
+    const unionMax = Math.max(A.max[offsetAxis], B.max[offsetAxis])
+    const offset = unionMax + offsetBase - start[offsetAxis]
+    dims.push({ axis, start, end, offsetAxis, offset, value: Math.abs(p2 - p1), kind })
+  }
+
+  // gap по оси расхождения — между обращёнными гранями
+  {
+    const a = sep
+    const b = ((a + 1) % 3) as 0 | 1 | 2
+    const c = ((a + 2) % 3) as 0 | 1 | 2
+    const aLeft = A.center[a] <= B.center[a]
+    const p1 = aLeft ? A.max[a] : B.max[a]
+    const p2 = aLeft ? B.min[a] : A.min[a]
+    const rb = (Math.max(A.min[b], B.min[b]) + Math.min(A.max[b], B.max[b])) / 2
+    const rc = (Math.max(A.min[c], B.min[c]) + Math.min(A.max[c], B.max[c])) / 2
+    pushDim(a, p1, p2, rb, rc, 40, 'gap')
+  }
+
+  // edge — разница кромок по остальным осям
+  let stagger = 80
+  for (let a = 0 as 0 | 1 | 2; a < 3; a = (a + 1) as 0 | 1 | 2) {
+    if (a === sep) continue
+    const b = ((a + 1) % 3) as 0 | 1 | 2
+    const c = ((a + 2) % 3) as 0 | 1 | 2
+    const rb = (A.center[b] + B.center[b]) / 2
+    const rc = (A.center[c] + B.center[c]) / 2
+    for (const edge of ['min', 'max'] as const) {
+      const p1 = A[edge][a]
+      const p2 = B[edge][a]
+      if (Math.abs(p1 - p2) <= 1) continue
+      pushDim(a, p1, p2, rb, rc, stagger, 'edge')
+      stagger += 55
+    }
+  }
+
+  return dims
+}
+
 /** Новая позиция выделенной детали, чтобы размер chip стал равен newValue. */
 export function applyDim(
   sel: Part,

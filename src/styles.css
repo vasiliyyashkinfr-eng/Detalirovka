@@ -125,6 +125,19 @@ body {
 }
 .dim-chip:hover { background: #3b82f6; }
 .dim-chip.neg { background: rgba(185, 28, 28, .92); border-color: #f87171; }
+.dim-draft {
+  background: rgba(15, 20, 25, .9);
+  border: 1px solid #e6edf3;
+  color: #fff;
+  border-radius: 5px;
+  padding: 1px 6px;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  user-select: none;
+}
+.dim-draft.edge { border-color: #fbbf24; color: #fde68a; }
+
 .dim-input {
   width: 64px;
   padding: 2px 6px;
@@ -271,6 +284,7 @@ input[type=checkbox] { width: auto; }
   font-size: 13px;
 }
 .part-item.active { border-color: var(--accent-2); background: #1d2b3f; }
+.part-item.secondary { border-color: #4ade80; background: #15281c; }
 .part-name { font-weight: 500; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .part-dims { color: var(--muted); font-size: 12px; white-space: nowrap; }
 .part-copy {
@@ -286,6 +300,20 @@ input[type=checkbox] { width: auto; }
   flex: none;
 }
 .part-copy:hover { border-color: var(--accent-2); color: var(--text); }
+.part-measure {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  border-radius: 6px;
+  width: 26px;
+  height: 26px;
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  flex: none;
+}
+.part-measure:hover { border-color: #4ade80; color: #4ade80; }
+.part-measure.on { border-color: #4ade80; color: #052e16; background: #4ade80; }
 
 .editor-wrap {
   border-top: 1px solid var(--border);

@@ -88,7 +88,7 @@ export default function App() {
       <div className="content">
         <div className="canvas-area">
           {loaded && <Scene3D />}
-          <div className="canvas-hint">ЛКМ — выбрать деталь · перетягивай за стрелки · колесо/жест — zoom</div>
+          <div className="canvas-hint">ЛКМ — выбрать · Shift+ЛКМ (или ↔ в списке) — вторая деталь для размеров · перетягивай за стрелки</div>
         </div>
         <aside className="side-panel">
           <nav className="tabs">
