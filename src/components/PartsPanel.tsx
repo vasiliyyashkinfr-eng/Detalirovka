@@ -1,6 +1,7 @@
 import { useProjectStore } from '../store/useProjectStore'
 import { thicknessOf } from '../lib/geometry'
 import PartEditor from './PartEditor'
+import SnapSettings from './SnapSettings'
 
 export default function PartsPanel() {
   const project = useProjectStore((s) => s.project)
@@ -13,6 +14,7 @@ export default function PartsPanel() {
 
   return (
     <div className="panel-body">
+      <SnapSettings />
       <div className="row gap wrap">
         <button className="btn primary" onClick={() => addPart()}>+ Деталь</button>
         {project.parts.length > 0 && (

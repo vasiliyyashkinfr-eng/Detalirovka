@@ -25,19 +25,20 @@ export function createMaterial(partial: Partial<Material> = {}): Material {
 
 export function createPart(partial: Partial<Part> = {}): Part {
   return {
-    id: uid('part'),
     name: 'Деталь',
     role: 'custom' as PartRole,
     materialId: DEFAULT_MATERIALS[0].id,
     length: 600,
     width: 300,
     orientation: 'flat',
-    edges: emptyEdges(),
     grain: 'none',
     qty: 1,
     position: [0, 0, 0],
-    holes: [],
     ...partial,
+    // id, edges и holes всегда свежие — даже если partial пришёл из существующей детали
+    id: uid('part'),
+    edges: { ...emptyEdges(), ...partial.edges },
+    holes: (partial.holes ?? []).map((h) => ({ ...h })),
   }
 }
 

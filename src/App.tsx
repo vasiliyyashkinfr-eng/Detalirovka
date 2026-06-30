@@ -6,6 +6,7 @@ import CutListTable from './components/CutListTable'
 import MaterialsPanel from './components/MaterialsPanel'
 import CabinetDialog from './components/CabinetDialog'
 import { useProjectStore } from './store/useProjectStore'
+import { useUiStore } from './store/useUiStore'
 import { lastProjectId, loadProject } from './lib/persistence'
 import { migrateProject } from './lib/persistence'
 
@@ -39,13 +40,33 @@ export default function App() {
     }
   }, [setProject])
 
-  // Горячие клавиши undo/redo.
+  // Горячие клавиши: undo/redo и сдвиг выделенной детали стрелками.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
         e.preventDefault()
         if (e.shiftKey) useProjectStore.getState().redo()
         else useProjectStore.getState().undo()
+        return
+      }
+
+      // Не перехватываем стрелки, когда фокус в поле ввода.
+      const tag = (document.activeElement?.tagName ?? '').toLowerCase()
+      if (tag === 'input' || tag === 'select' || tag === 'textarea') return
+
+      const { selectedId, nudgeSelected } = useProjectStore.getState()
+      if (!selectedId) return
+      const step = useUiStore.getState().gridStep || 1
+      // ←/→ — ось X; ↑/↓ — глубина Z; Shift+↑/↓ — высота Y.
+      switch (e.key) {
+        case 'ArrowLeft':
+          e.preventDefault(); nudgeSelected(0, -step); break
+        case 'ArrowRight':
+          e.preventDefault(); nudgeSelected(0, step); break
+        case 'ArrowUp':
+          e.preventDefault(); nudgeSelected(e.shiftKey ? 1 : 2, e.shiftKey ? step : -step); break
+        case 'ArrowDown':
+          e.preventDefault(); nudgeSelected(e.shiftKey ? 1 : 2, e.shiftKey ? -step : step); break
       }
     }
     window.addEventListener('keydown', onKey)

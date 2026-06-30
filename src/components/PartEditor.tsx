@@ -1,4 +1,7 @@
+import { useState } from 'react'
 import { useProjectStore } from '../store/useProjectStore'
+import { useUiStore } from '../store/useUiStore'
+import { aabbOf, placeRelative, RELATION_LABELS, type Relation } from '../lib/snap'
 import type { EdgeThickness, Orientation, Part } from '../types'
 import NumberField from './NumberField'
 
@@ -31,16 +34,42 @@ function EdgeSelect({
   )
 }
 
+const AXES: { value: 0 | 1 | 2; label: string }[] = [
+  { value: 0, label: 'X (вправо)' },
+  { value: 1, label: 'Y (вверх)' },
+  { value: 2, label: 'Z (вглубь)' },
+]
+
 export default function PartEditor({ part }: { part: Part }) {
   const project = useProjectStore((s) => s.project)
   const updatePart = useProjectStore((s) => s.updatePart)
   const duplicatePart = useProjectStore((s) => s.duplicatePart)
   const removePart = useProjectStore((s) => s.removePart)
+  const arrayDuplicate = useProjectStore((s) => s.arrayDuplicate)
+  const beginInteraction = useProjectStore((s) => s.beginInteraction)
+  const gap = useUiStore((s) => s.gap)
+
+  const others = project.parts.filter((x) => x.id !== part.id)
+  const [targetId, setTargetId] = useState<string>('')
+  const [relation, setRelation] = useState<Relation>('right')
+  const [arrCount, setArrCount] = useState(2)
+  const [arrAxis, setArrAxis] = useState<0 | 1 | 2>(0)
+  const [arrStep, setArrStep] = useState(300)
 
   const set = (patch: Partial<Part>) => updatePart(part.id, patch)
   const setPos = (i: number, v: number) => {
     const pos: [number, number, number] = [...part.position]
     pos[i] = v
+    set({ position: pos })
+  }
+
+  const effectiveTargetId = targetId || others[0]?.id || ''
+
+  const applyRelative = () => {
+    const tgt = project.parts.find((x) => x.id === effectiveTargetId)
+    if (!tgt) return
+    beginInteraction()
+    const pos = placeRelative(aabbOf(part, project.materials), aabbOf(tgt, project.materials), relation, gap)
     set({ position: pos })
   }
 
@@ -69,13 +98,22 @@ export default function PartEditor({ part }: { part: Part }) {
         </label>
       </div>
 
-      <label>Ориентация
-        <select value={part.orientation} onChange={(e) => set({ orientation: e.target.value as Orientation })}>
-          {ORIENTATIONS.map((o) => (
-            <option key={o.value} value={o.value}>{o.label}</option>
-          ))}
-        </select>
-      </label>
+      <div className="row gap">
+        <label className="grow">Ориентация
+          <select value={part.orientation} onChange={(e) => set({ orientation: e.target.value as Orientation })}>
+            {ORIENTATIONS.map((o) => (
+              <option key={o.value} value={o.value}>{o.label}</option>
+            ))}
+          </select>
+        </label>
+        <button
+          className="btn"
+          title="Повернуть деталь на 90° в плоскости (длина ↔ ширина)"
+          onClick={() => set({ length: part.width, width: part.length })}
+        >
+          ⟳ 90°
+        </button>
+      </div>
 
       <label>Текстура
         <select value={part.grain} onChange={(e) => set({ grain: e.target.value as Part['grain'] })}>
@@ -102,6 +140,45 @@ export default function PartEditor({ part }: { part: Part }) {
           <NumberField value={Math.round(part.position[1])} onChange={(n) => setPos(1, n)} />
           <NumberField value={Math.round(part.position[2])} onChange={(n) => setPos(2, n)} />
         </div>
+      </div>
+
+      {others.length > 0 && (
+        <div className="field-group">
+          <div className="field-label">Притянуть к детали (зазор берётся из настроек привязки: {gap} мм)</div>
+          <div className="grid2">
+            <select value={effectiveTargetId} onChange={(e) => setTargetId(e.target.value)}>
+              {others.map((o) => (
+                <option key={o.id} value={o.id}>{o.name}</option>
+              ))}
+            </select>
+            <select value={relation} onChange={(e) => setRelation(e.target.value as Relation)}>
+              {RELATION_LABELS.map((r) => (
+                <option key={r.value} value={r.value}>{r.label}</option>
+              ))}
+            </select>
+          </div>
+          <button className="btn" onClick={applyRelative}>Поставить</button>
+        </div>
+      )}
+
+      <div className="field-group">
+        <div className="field-label">Массив (копии со смещением)</div>
+        <div className="grid3">
+          <label className="tiny">Копий
+            <NumberField value={arrCount} onChange={setArrCount} min={1} max={50} />
+          </label>
+          <label className="tiny">Ось
+            <select value={arrAxis} onChange={(e) => setArrAxis(Number(e.target.value) as 0 | 1 | 2)}>
+              {AXES.map((a) => <option key={a.value} value={a.value}>{a.label}</option>)}
+            </select>
+          </label>
+          <label className="tiny">Шаг, мм
+            <NumberField value={arrStep} onChange={setArrStep} />
+          </label>
+        </div>
+        <button className="btn" onClick={() => arrayDuplicate(part.id, arrCount, arrAxis, arrStep)}>
+          Создать массив
+        </button>
       </div>
 
       <label>Цвет (переопределение)

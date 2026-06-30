@@ -3,8 +3,12 @@ import { Canvas, useThree } from '@react-three/fiber'
 import { Edges, GizmoHelper, GizmoViewport, Grid, OrbitControls, TransformControls } from '@react-three/drei'
 import * as THREE from 'three'
 import { useProjectStore } from '../store/useProjectStore'
-import { MM, partSize, projectBounds } from '../lib/geometry'
+import { useUiStore } from '../store/useUiStore'
+import { MM, partSize, projectBounds, thicknessOf } from '../lib/geometry'
+import { aabbOf, snapToFaces } from '../lib/snap'
 import type { Material, Part } from '../types'
+
+const FACE_SNAP_THRESHOLD = 25 // мм, радиус притяжения граней
 
 function PartMesh({
   part,
@@ -51,6 +55,10 @@ function SceneContent() {
   const select = useProjectStore((s) => s.select)
   const movePart = useProjectStore((s) => s.movePart)
   const beginInteraction = useProjectStore((s) => s.beginInteraction)
+  const gridStep = useUiStore((s) => s.gridStep)
+  const snapGrid = useUiStore((s) => s.snapGrid)
+  const faceSnap = useUiStore((s) => s.faceSnap)
+  const gap = useUiStore((s) => s.gap)
   const orbitRef = useRef<any>(null)
   const [target, setTarget] = useState<THREE.Object3D | null>(null)
 
@@ -126,15 +134,29 @@ function SceneContent() {
         <TransformControls
           object={target}
           mode="translate"
-          translationSnap={MM} // шаг 1 мм
+          translationSnap={snapGrid ? gridStep * MM : null}
           onMouseDown={() => beginInteraction()}
           onObjectChange={() => {
             if (!selectedId || !target) return
-            movePart(selectedId, [
+            const posMm: [number, number, number] = [
               target.position.x / MM,
               target.position.y / MM,
               target.position.z / MM,
-            ])
+            ]
+            let finalMm = posMm
+            if (faceSnap) {
+              const sel = parts.find((x) => x.id === selectedId)
+              if (sel) {
+                const others = parts
+                  .filter((x) => x.id !== selectedId)
+                  .map((x) => aabbOf(x, materials))
+                const sz = partSize(sel, thicknessOf(sel, materials))
+                finalMm = snapToFaces(posMm, sz, others, gap, FACE_SNAP_THRESHOLD)
+                // Возвращаем привязанную позицию в объект, чтобы картинка совпадала
+                target.position.set(finalMm[0] * MM, finalMm[1] * MM, finalMm[2] * MM)
+              }
+            }
+            movePart(selectedId, finalMm)
           }}
         />
       )}
