@@ -29,13 +29,17 @@ function PartMesh({
   material,
   selected,
   secondary,
-  onPointer,
+  measureEdges,
+  onPickFace,
+  onSelect,
 }: {
   part: Part
   material?: Material
   selected: boolean
   secondary: boolean
-  onPointer: (id: string, e: any) => void
+  measureEdges: boolean
+  onPickFace: (id: string, e: any) => void
+  onSelect: (id: string, e: any) => void
 }) {
   const th = material?.thickness ?? 18
   const [sx, sy, sz] = partSize(part, th)
@@ -47,8 +51,18 @@ function PartMesh({
       name={part.id}
       position={[part.position[0] * MM, part.position[1] * MM, part.position[2] * MM]}
       onPointerDown={(e) => {
+        // В режиме кромок выбираем грань по нажатию (гизмо в этом режиме скрыт).
+        if (measureEdges) {
+          e.stopPropagation()
+          onPickFace(part.id, e)
+        }
+      }}
+      onClick={(e) => {
+        // Вне режима кромок — выделение по клику, чтобы перетаскивание гизмо
+        // (которое проходит поверх других деталей) не выделяло деталь позади.
+        if (measureEdges) return
         e.stopPropagation()
-        onPointer(part.id, e)
+        onSelect(part.id, e)
       }}
       castShadow
       receiveShadow
@@ -461,7 +475,7 @@ function EdgeMeasure({ parts, materials }: { parts: Part[]; materials: Material[
   )
 }
 
-function SceneContent() {
+function SceneContent({ tcRef }: { tcRef: { current: any } }) {
   const { scene } = useThree()
   const project = useProjectStore((s) => s.project)
   const selectedId = useProjectStore((s) => s.selectedId)
@@ -479,17 +493,19 @@ function SceneContent() {
   const pickEdge = useUiStore((s) => s.pickEdge)
   const orbitRef = useRef<any>(null)
 
-  // Клик по детали: в режиме кромок — выбор грани; иначе выбор детали (Shift — вторая).
-  const handlePartPointer = (id: string, e: any) => {
-    if (measureEdges) {
-      const n = e.face?.normal
-      if (!n) return
-      const abs = [Math.abs(n.x), Math.abs(n.y), Math.abs(n.z)]
-      const axis = (abs[0] >= abs[1] && abs[0] >= abs[2] ? 0 : abs[1] >= abs[2] ? 1 : 2) as 0 | 1 | 2
-      const comp = axis === 0 ? n.x : axis === 1 ? n.y : n.z
-      pickEdge({ partId: id, axis, ref: comp > 0 ? 'max' : 'min' })
-      return
-    }
+  // Выбор грани в режиме кромок (по нажатию).
+  const handlePickFace = (id: string, e: any) => {
+    const n = e.face?.normal
+    if (!n) return
+    const abs = [Math.abs(n.x), Math.abs(n.y), Math.abs(n.z)]
+    const axis = (abs[0] >= abs[1] && abs[0] >= abs[2] ? 0 : abs[1] >= abs[2] ? 1 : 2) as 0 | 1 | 2
+    const comp = axis === 0 ? n.x : axis === 1 ? n.y : n.z
+    pickEdge({ partId: id, axis, ref: comp > 0 ? 'max' : 'min' })
+  }
+
+  // Выделение детали (по клику). Игнорируем, если клик пришёлся на ручку гизмо.
+  const handleSelect = (id: string, e: any) => {
+    if (tcRef.current?.dragging || tcRef.current?.axis) return
     const additive = e.shiftKey || (e.nativeEvent as PointerEvent)?.shiftKey
     if (additive && selectedId && id !== selectedId) selectSecondary(id)
     else select(id)
@@ -561,7 +577,9 @@ function SceneContent() {
           material={materials.find((m) => m.id === p.materialId)}
           selected={p.id === selectedId}
           secondary={p.id === secondaryId}
-          onPointer={handlePartPointer}
+          measureEdges={measureEdges}
+          onPickFace={handlePickFace}
+          onSelect={handleSelect}
         />
       ))}
 
@@ -585,6 +603,7 @@ function SceneContent() {
 
       {target && !measureEdges && (
         <TransformControls
+          ref={tcRef}
           object={target}
           mode="translate"
           translationSnap={snapGrid ? gridStep * MM : null}
@@ -633,6 +652,7 @@ function SceneContent() {
 export default function Scene3D() {
   const select = useProjectStore((s) => s.select)
   const clearEdges = useUiStore((s) => s.clearEdges)
+  const tcRef = useRef<any>(null)
   return (
     <Canvas
       shadows
@@ -640,12 +660,15 @@ export default function Scene3D() {
       gl={{ logarithmicDepthBuffer: true }}
       camera={{ position: [1.2, 1, 1.4], fov: 45, near: 0.01, far: 100 }}
       onPointerMissed={() => {
+        // Не сбрасываем выделение, если взаимодействуем с гизмо (клик по стрелке
+        // мимо деталей засчитывается как «промах»).
+        if (tcRef.current?.dragging || tcRef.current?.axis) return
         select(null)
         clearEdges()
       }}
       style={{ touchAction: 'none' }}
     >
-      <SceneContent />
+      <SceneContent tcRef={tcRef} />
     </Canvas>
   )
 }
