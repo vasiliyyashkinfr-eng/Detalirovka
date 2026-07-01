@@ -141,6 +141,12 @@ body {
 .dim-draft.edge-pair .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
 .measure-toggle.on { background: #0e7490; border-color: #22d3ee; color: #fff; }
 
+.edge-pick { display: flex; flex-direction: column; gap: 5px; }
+.edge-pick-head { font-size: 13px; display: flex; align-items: center; gap: 6px; }
+.edge-pick-head .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+.edge-pick .seg { flex-wrap: wrap; }
+.edge-pick .seg-btn { flex: 1; min-width: 84px; }
+
 .dim-input {
   width: 64px;
   padding: 2px 6px;

@@ -74,23 +74,26 @@ export function computeDims(
 
 export type DimKind = 'gap' | 'min' | 'max'
 
-/** Ссылка на конкретную кромку (грань) детали. */
+/** Опора на детали: мин. кромка / середина толщины / макс. кромка по оси. */
+export type EdgeAnchor = 'min' | 'center' | 'max'
+
+/** Ссылка на конкретную опору (кромку/ось) детали. */
 export interface EdgeRef {
   partId: string
   axis: 0 | 1 | 2
-  side: 'min' | 'max'
+  ref: EdgeAnchor
 }
 
-/** Положение грани детали вдоль её оси, мм. */
-export function facePos(box: AABB, axis: 0 | 1 | 2, side: 'min' | 'max'): number {
-  return side === 'max' ? box.max[axis] : box.min[axis]
+/** Положение опоры детали вдоль её оси, мм. */
+export function facePos(box: AABB, axis: 0 | 1 | 2, ref: EdgeAnchor): number {
+  return ref === 'max' ? box.max[axis] : ref === 'min' ? box.min[axis] : box.center[axis]
 }
 
-/** 4 угла грани (для подсветки), мм. */
-export function faceCorners(box: AABB, axis: 0 | 1 | 2, side: 'min' | 'max'): Vec3[] {
+/** 4 угла плоскости опоры (для подсветки), мм. */
+export function faceCorners(box: AABB, axis: 0 | 1 | 2, ref: EdgeAnchor): Vec3[] {
   const b = ((axis + 1) % 3) as 0 | 1 | 2
   const c = ((axis + 2) % 3) as 0 | 1 | 2
-  const a = facePos(box, axis, side)
+  const a = facePos(box, axis, ref)
   const mk = (sb: number, sc: number): Vec3 => {
     const p: Vec3 = [0, 0, 0]
     p[axis] = a
@@ -114,7 +117,7 @@ export function faceCorners(box: AABB, axis: 0 | 1 | 2, side: 'min' | 'max'): Ve
 export function applyEdgePair(
   mover: Part,
   materials: Material[],
-  moverSide: 'min' | 'max',
+  moverRef: EdgeAnchor,
   axis: 0 | 1 | 2,
   anchorPos: number,
   dir: 1 | -1,
@@ -122,11 +125,22 @@ export function applyEdgePair(
 ): Vec3 {
   const M = aabbOf(mover, materials)
   const half = M.size[axis] / 2
-  const sideOffset = moverSide === 'max' ? half : -half
-  const newFace = anchorPos + dir * value
+  const refOffset = moverRef === 'max' ? half : moverRef === 'min' ? -half : 0
+  const newRefPos = anchorPos + dir * value
   const pos: Vec3 = [...mover.position] as Vec3
-  pos[axis] = newFace - sideOffset
+  pos[axis] = newRefPos - refOffset
   return pos
+}
+
+const ANCHOR_LABELS: Record<0 | 1 | 2, [string, string, string]> = {
+  0: ['лев. кромка', 'центр', 'прав. кромка'],
+  1: ['ниж. кромка', 'середина', 'верх. кромка'],
+  2: ['задн. кромка', 'центр', 'перед. кромка'],
+}
+
+export function anchorLabel(axis: 0 | 1 | 2, ref: EdgeAnchor): string {
+  const [mn, ct, mx] = ANCHOR_LABELS[axis]
+  return ref === 'min' ? mn : ref === 'max' ? mx : ct
 }
 
 export interface PairDim {

@@ -322,7 +322,7 @@ function EdgeHighlight({
   const part = parts.find((p) => p.id === edge.partId)
   if (!part) return null
   const box = aabbOf(part, materials)
-  const corners = faceCorners(box, edge.axis, edge.side).map(
+  const corners = faceCorners(box, edge.axis, edge.ref).map(
     (c) => [c[0] * MM, c[1] * MM, c[2] * MM] as [number, number, number],
   )
   const positions = new Float32Array([
@@ -367,8 +367,8 @@ function EdgeMeasure({ parts, materials }: { parts: Part[]; materials: Material[
           const axis = edgeA.axis
           const A = aabbOf(pa, materials)
           const B = aabbOf(pb, materials)
-          const posA = facePos(A, axis, edgeA.side)
-          const posB = facePos(B, axis, edgeB.side)
+          const posA = facePos(A, axis, edgeA.ref)
+          const posB = facePos(B, axis, edgeB.ref)
           const value = Math.abs(posB - posA)
           const dir = posB - posA >= 0 ? 1 : -1
           const b = ((axis + 1) % 3) as 0 | 1 | 2
@@ -407,7 +407,7 @@ function EdgeMeasure({ parts, materials }: { parts: Part[]; materials: Material[
             if (!isFinite(v) || samePart) return
             beginInteraction()
             updatePart(pb.id, {
-              position: applyEdgePair(pb, materials, edgeB.side, axis, posA, dir, v),
+              position: applyEdgePair(pb, materials, edgeB.ref, axis, posA, dir, v),
             })
           }
           return (
@@ -487,7 +487,7 @@ function SceneContent() {
       const abs = [Math.abs(n.x), Math.abs(n.y), Math.abs(n.z)]
       const axis = (abs[0] >= abs[1] && abs[0] >= abs[2] ? 0 : abs[1] >= abs[2] ? 1 : 2) as 0 | 1 | 2
       const comp = axis === 0 ? n.x : axis === 1 ? n.y : n.z
-      pickEdge({ partId: id, axis, side: comp > 0 ? 'max' : 'min' })
+      pickEdge({ partId: id, axis, ref: comp > 0 ? 'max' : 'min' })
       return
     }
     const additive = e.shiftKey || (e.nativeEvent as PointerEvent)?.shiftKey

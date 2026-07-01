@@ -1,8 +1,10 @@
 import { useProjectStore } from '../store/useProjectStore'
 import { thicknessOf } from '../lib/geometry'
+import { useUiStore } from '../store/useUiStore'
 import { PRESETS, presetPart } from '../lib/presets'
 import PartEditor from './PartEditor'
 import PairEdgeTable from './PairEdgeTable'
+import EdgeMeasurePanel from './EdgeMeasurePanel'
 import SnapSettings from './SnapSettings'
 
 export default function PartsPanel() {
@@ -15,11 +17,13 @@ export default function PartsPanel() {
   const duplicatePart = useProjectStore((s) => s.duplicatePart)
   const clearParts = useProjectStore((s) => s.clearParts)
 
+  const measureEdges = useUiStore((s) => s.measureEdges)
   const selected = project.parts.find((p) => p.id === selectedId)
 
   return (
     <div className="panel-body">
       <SnapSettings />
+      {measureEdges && <EdgeMeasurePanel />}
 
       <div className="add-row">
         {PRESETS.map((preset) => (

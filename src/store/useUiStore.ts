@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { EdgeRef } from '../lib/dimensions'
+import type { EdgeAnchor, EdgeRef } from '../lib/dimensions'
 
 export const GRID_STEPS = [1, 8, 16, 32] as const
 
@@ -15,11 +15,12 @@ interface UiStore {
   edgeB: EdgeRef | null
   set: (patch: Partial<Omit<UiStore, 'set'>>) => void
   pickEdge: (ref: EdgeRef) => void
+  setEdgeAnchor: (which: 'A' | 'B', ref: EdgeAnchor) => void
   clearEdges: () => void
 }
 
 function sameEdge(a: EdgeRef | null, b: EdgeRef): boolean {
-  return !!a && a.partId === b.partId && a.axis === b.axis && a.side === b.side
+  return !!a && a.partId === b.partId && a.axis === b.axis && a.ref === b.ref
 }
 
 export const useUiStore = create<UiStore>((set) => ({
@@ -44,5 +45,11 @@ export const useUiStore = create<UiStore>((set) => ({
         return { edgeB: ref }
       }
       return { edgeA: ref, edgeB: null } // начинаем новую пару
+    }),
+  setEdgeAnchor: (which, ref) =>
+    set((s) => {
+      const cur = which === 'A' ? s.edgeA : s.edgeB
+      if (!cur) return {}
+      return which === 'A' ? { edgeA: { ...cur, ref } } : { edgeB: { ...cur, ref } }
     }),
 }))
