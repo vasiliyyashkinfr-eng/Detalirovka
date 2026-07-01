@@ -153,6 +153,7 @@ export function computePairDims(A: AABB, B: AABB): PairDim[] {
     }
   }
 
+  // dir: +1 — выносим линию за верхнюю/правую сторону, -1 — за нижнюю/левую.
   const pushDim = (
     axis: 0 | 1 | 2,
     p1: number,
@@ -160,6 +161,7 @@ export function computePairDims(A: AABB, B: AABB): PairDim[] {
     rb: number,
     rc: number,
     offsetBase: number,
+    dir: 1 | -1,
     kind: DimKind,
     value: number,
     sign: 1 | -1,
@@ -175,8 +177,9 @@ export function computePairDims(A: AABB, B: AABB): PairDim[] {
     start[c] = rc
     end[c] = rc
     const offsetAxis = (axis === 1 ? 0 : 1) as 0 | 1 | 2
-    const unionMax = Math.max(A.max[offsetAxis], B.max[offsetAxis])
-    const offset = unionMax + offsetBase - start[offsetAxis]
+    const edgePos =
+      dir > 0 ? Math.max(A.max[offsetAxis], B.max[offsetAxis]) : Math.min(A.min[offsetAxis], B.min[offsetAxis])
+    const offset = edgePos + dir * offsetBase - start[offsetAxis]
     dims.push({ axis, start, end, offsetAxis, offset, value, kind, sign })
   }
 
@@ -190,11 +193,13 @@ export function computePairDims(A: AABB, B: AABB): PairDim[] {
     const p2 = aLeft ? B.min[a] : A.min[a]
     const rb = (Math.max(A.min[b], B.min[b]) + Math.min(A.max[b], B.max[b])) / 2
     const rc = (Math.max(A.min[c], B.min[c]) + Math.min(A.max[c], B.max[c])) / 2
-    pushDim(a, p1, p2, rb, rc, 40, 'gap', Math.abs(p2 - p1), aLeft ? -1 : 1)
+    pushDim(a, p1, p2, rb, rc, 40, 1, 'gap', Math.abs(p2 - p1), aLeft ? -1 : 1)
   }
 
-  // edge — разница кромок по остальным осям (показываем ненулевые)
-  let stagger = 80
+  // edge — разница ВСЕХ кромок по остальным осям (в т.ч. нулевые = заподлицо).
+  // min-кромки выносим в одну сторону, max — в другую, чтобы не наезжали.
+  let stMin = 40
+  let stMax = 40
   for (let a = 0 as 0 | 1 | 2; a < 3; a = (a + 1) as 0 | 1 | 2) {
     if (a === sep) continue
     const b = ((a + 1) % 3) as 0 | 1 | 2
@@ -205,9 +210,9 @@ export function computePairDims(A: AABB, B: AABB): PairDim[] {
       const p1 = A[edge][a]
       const p2 = B[edge][a]
       const d = p1 - p2
-      if (Math.abs(d) <= 1) continue
-      pushDim(a, p1, p2, rb, rc, stagger, edge, Math.abs(d), d >= 0 ? 1 : -1)
-      stagger += 55
+      const dir = edge === 'min' ? -1 : 1
+      const base = edge === 'min' ? (stMin += 55) : (stMax += 55)
+      pushDim(a, p1, p2, rb, rc, base, dir, edge, Math.abs(d), d >= 0 ? 1 : -1)
     }
   }
 
