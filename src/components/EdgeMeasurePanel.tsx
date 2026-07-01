@@ -4,7 +4,9 @@ import { aabbOf } from '../lib/snap'
 import { anchorLabel, applyEdgePair, facePos, type EdgeAnchor, type EdgeRef } from '../lib/dimensions'
 import NumberField from './NumberField'
 
-const ANCHORS: EdgeAnchor[] = ['min', 'center', 'max']
+// Порядок сверху вниз: верхняя/дальняя кромка → середина → нижняя/ближняя,
+// чтобы кнопки соответствовали физическому положению кромок.
+const ANCHORS: EdgeAnchor[] = ['max', 'center', 'min']
 
 function AnchorPicker({
   edge,
