@@ -2,7 +2,8 @@ import { GRID_STEPS, useUiStore } from '../store/useUiStore'
 import NumberField from './NumberField'
 
 export default function SnapSettings() {
-  const { gridStep, snapGrid, faceSnap, gap, showDims, dimMode, set } = useUiStore()
+  const { gridStep, snapGrid, faceSnap, gap, showDims, dimMode, measureEdges, set, clearEdges } =
+    useUiStore()
 
   return (
     <div className="snap-settings">
@@ -57,6 +58,20 @@ export default function SnapSettings() {
             по осям
           </button>
         </div>
+      </div>
+      <div className="snap-row">
+        <button
+          className={'btn small measure-toggle' + (measureEdges ? ' on' : '')}
+          onClick={() => {
+            clearEdges()
+            set({ measureEdges: !measureEdges })
+          }}
+        >
+          📏 Размер по кромкам {measureEdges ? '· вкл' : ''}
+        </button>
+        {measureEdges && (
+          <span className="muted tiny">кликни грань → голубая, вторую грань → розовая, введи размер</span>
+        )}
       </div>
     </div>
   )

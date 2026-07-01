@@ -6,8 +6,21 @@ import { useProjectStore } from '../store/useProjectStore'
 import { useUiStore } from '../store/useUiStore'
 import { MM, partSize, projectBounds, thicknessOf } from '../lib/geometry'
 import { aabbOf, snapToFaces } from '../lib/snap'
-import { applyDim, applyPairDim, computeDims, computePairDims, type PairDim } from '../lib/dimensions'
+import {
+  applyDim,
+  applyEdgePair,
+  applyPairDim,
+  computeDims,
+  computePairDims,
+  facePos,
+  faceCorners,
+  type EdgeRef,
+  type PairDim,
+} from '../lib/dimensions'
 import type { Material, Part, Vec3 } from '../types'
+
+const EDGE_A_COLOR = '#22d3ee' // голубой — первая кромка
+const EDGE_B_COLOR = '#e879f9' // розовый — вторая кромка
 
 const FACE_SNAP_THRESHOLD = 25 // мм, радиус притяжения граней
 
@@ -16,13 +29,13 @@ function PartMesh({
   material,
   selected,
   secondary,
-  onSelect,
+  onPointer,
 }: {
   part: Part
   material?: Material
   selected: boolean
   secondary: boolean
-  onSelect: (id: string, additive: boolean) => void
+  onPointer: (id: string, e: any) => void
 }) {
   const th = material?.thickness ?? 18
   const [sx, sy, sz] = partSize(part, th)
@@ -35,7 +48,7 @@ function PartMesh({
       position={[part.position[0] * MM, part.position[1] * MM, part.position[2] * MM]}
       onPointerDown={(e) => {
         e.stopPropagation()
-        onSelect(part.id, e.shiftKey || (e.nativeEvent as PointerEvent).shiftKey)
+        onPointer(part.id, e)
       }}
       castShadow
       receiveShadow
@@ -295,6 +308,159 @@ function PairDimensions({
   )
 }
 
+function EdgeHighlight({
+  edge,
+  parts,
+  materials,
+  color,
+}: {
+  edge: EdgeRef
+  parts: Part[]
+  materials: Material[]
+  color: string
+}) {
+  const part = parts.find((p) => p.id === edge.partId)
+  if (!part) return null
+  const box = aabbOf(part, materials)
+  const corners = faceCorners(box, edge.axis, edge.side).map(
+    (c) => [c[0] * MM, c[1] * MM, c[2] * MM] as [number, number, number],
+  )
+  const positions = new Float32Array([
+    ...corners[0],
+    ...corners[1],
+    ...corners[2],
+    ...corners[0],
+    ...corners[2],
+    ...corners[3],
+  ])
+  return (
+    <group>
+      <mesh renderOrder={999}>
+        <bufferGeometry>
+          <bufferAttribute attach="attributes-position" args={[positions, 3]} />
+        </bufferGeometry>
+        <meshBasicMaterial color={color} transparent opacity={0.4} depthTest={false} side={THREE.DoubleSide} />
+      </mesh>
+      <Line points={[...corners, corners[0]]} color={color} lineWidth={3} />
+    </group>
+  )
+}
+
+function EdgeMeasure({ parts, materials }: { parts: Part[]; materials: Material[] }) {
+  const edgeA = useUiStore((s) => s.edgeA)
+  const edgeB = useUiStore((s) => s.edgeB)
+  const updatePart = useProjectStore((s) => s.updatePart)
+  const beginInteraction = useProjectStore((s) => s.beginInteraction)
+  const [editing, setEditing] = useState(false)
+  const [text, setText] = useState('')
+
+  return (
+    <>
+      {edgeA && <EdgeHighlight edge={edgeA} parts={parts} materials={materials} color={EDGE_A_COLOR} />}
+      {edgeB && <EdgeHighlight edge={edgeB} parts={parts} materials={materials} color={EDGE_B_COLOR} />}
+      {edgeA &&
+        edgeB &&
+        (() => {
+          const pa = parts.find((p) => p.id === edgeA.partId)
+          const pb = parts.find((p) => p.id === edgeB.partId)
+          if (!pa || !pb) return null
+          const axis = edgeA.axis
+          const A = aabbOf(pa, materials)
+          const B = aabbOf(pb, materials)
+          const posA = facePos(A, axis, edgeA.side)
+          const posB = facePos(B, axis, edgeB.side)
+          const value = Math.abs(posB - posA)
+          const dir = posB - posA >= 0 ? 1 : -1
+          const b = ((axis + 1) % 3) as 0 | 1 | 2
+          const c = ((axis + 2) % 3) as 0 | 1 | 2
+          const rb = (A.center[b] + B.center[b]) / 2
+          const rc = (A.center[c] + B.center[c]) / 2
+          const start: Vec3 = [0, 0, 0]
+          const end: Vec3 = [0, 0, 0]
+          start[axis] = posA
+          end[axis] = posB
+          start[b] = rb
+          end[b] = rb
+          start[c] = rc
+          end[c] = rc
+          const offsetAxis = (axis === 1 ? 0 : 1) as 0 | 1 | 2
+          const edgePos = Math.max(A.max[offsetAxis], B.max[offsetAxis])
+          const offset = edgePos + 60 - start[offsetAxis]
+          const toM = (p: Vec3): [number, number, number] => [p[0] * MM, p[1] * MM, p[2] * MM]
+          const dOff = (p: Vec3): [number, number, number] => {
+            const q: Vec3 = [...p] as Vec3
+            q[offsetAxis] += offset
+            return toM(q)
+          }
+          const dStart = dOff(start)
+          const dEnd = dOff(end)
+          const sign = Math.sign(posB - posA) || 1
+          const mid: [number, number, number] = [
+            (dStart[0] + dEnd[0]) / 2,
+            (dStart[1] + dEnd[1]) / 2,
+            (dStart[2] + dEnd[2]) / 2,
+          ]
+          const samePart = pa.id === pb.id
+          const commit = () => {
+            const v = parseFloat(text)
+            setEditing(false)
+            if (!isFinite(v) || samePart) return
+            beginInteraction()
+            updatePart(pb.id, {
+              position: applyEdgePair(pb, materials, edgeB.side, axis, posA, dir, v),
+            })
+          }
+          return (
+            <group>
+              <Line points={[toM(start), dStart]} color={EDGE_A_COLOR} lineWidth={1} transparent opacity={0.5} />
+              <Line points={[toM(end), dEnd]} color={EDGE_B_COLOR} lineWidth={1} transparent opacity={0.5} />
+              <Line points={[dStart, dEnd]} color="#e6edf3" lineWidth={1.5} />
+              <mesh position={dStart} rotation={arrowRot(axis, sign)}>
+                <coneGeometry args={[0.005, 0.018, 12]} />
+                <meshBasicMaterial color={EDGE_A_COLOR} />
+              </mesh>
+              <mesh position={dEnd} rotation={arrowRot(axis, -sign)}>
+                <coneGeometry args={[0.005, 0.018, 12]} />
+                <meshBasicMaterial color={EDGE_B_COLOR} />
+              </mesh>
+              <Html position={mid} center zIndexRange={[27, 0]}>
+                {editing && !samePart ? (
+                  <input
+                    className="dim-input"
+                    autoFocus
+                    inputMode="decimal"
+                    value={text}
+                    onChange={(e) => setText(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') commit()
+                      else if (e.key === 'Escape') setEditing(false)
+                    }}
+                    onBlur={commit}
+                  />
+                ) : (
+                  <button
+                    className="dim-draft edge-pair"
+                    title={samePart ? 'Размер детали' : 'Кликни и введи расстояние'}
+                    onPointerDown={(e) => {
+                      e.stopPropagation()
+                      if (samePart) return
+                      setText(String(Math.round(value)))
+                      setEditing(true)
+                    }}
+                  >
+                    <span className="dot" style={{ background: EDGE_A_COLOR }} />
+                    {Math.round(value)}
+                    <span className="dot" style={{ background: EDGE_B_COLOR }} />
+                  </button>
+                )}
+              </Html>
+            </group>
+          )
+        })()}
+    </>
+  )
+}
+
 function SceneContent() {
   const { scene } = useThree()
   const project = useProjectStore((s) => s.project)
@@ -305,16 +471,29 @@ function SceneContent() {
   const movePart = useProjectStore((s) => s.movePart)
   const beginInteraction = useProjectStore((s) => s.beginInteraction)
 
-  // Клик — основная деталь; Shift+клик — вторая (для размеров между двумя).
-  const handleSelect = (id: string, additive: boolean) => {
-    if (additive && selectedId && id !== selectedId) selectSecondary(id)
-    else select(id)
-  }
   const gridStep = useUiStore((s) => s.gridStep)
   const snapGrid = useUiStore((s) => s.snapGrid)
   const faceSnap = useUiStore((s) => s.faceSnap)
   const gap = useUiStore((s) => s.gap)
+  const measureEdges = useUiStore((s) => s.measureEdges)
+  const pickEdge = useUiStore((s) => s.pickEdge)
   const orbitRef = useRef<any>(null)
+
+  // Клик по детали: в режиме кромок — выбор грани; иначе выбор детали (Shift — вторая).
+  const handlePartPointer = (id: string, e: any) => {
+    if (measureEdges) {
+      const n = e.face?.normal
+      if (!n) return
+      const abs = [Math.abs(n.x), Math.abs(n.y), Math.abs(n.z)]
+      const axis = (abs[0] >= abs[1] && abs[0] >= abs[2] ? 0 : abs[1] >= abs[2] ? 1 : 2) as 0 | 1 | 2
+      const comp = axis === 0 ? n.x : axis === 1 ? n.y : n.z
+      pickEdge({ partId: id, axis, side: comp > 0 ? 'max' : 'min' })
+      return
+    }
+    const additive = e.shiftKey || (e.nativeEvent as PointerEvent)?.shiftKey
+    if (additive && selectedId && id !== selectedId) selectSecondary(id)
+    else select(id)
+  }
   const [target, setTarget] = useState<THREE.Object3D | null>(null)
 
   const parts = project.parts
@@ -382,23 +561,29 @@ function SceneContent() {
           material={materials.find((m) => m.id === p.materialId)}
           selected={p.id === selectedId}
           secondary={p.id === secondaryId}
-          onSelect={handleSelect}
+          onPointer={handlePartPointer}
         />
       ))}
 
-      <SelectionLabel parts={parts} materials={materials} selectedId={selectedId} />
-      {secondaryId ? (
-        <PairDimensions
-          parts={parts}
-          materials={materials}
-          selectedId={selectedId}
-          secondaryId={secondaryId}
-        />
+      {measureEdges ? (
+        <EdgeMeasure parts={parts} materials={materials} />
       ) : (
-        <DimensionChips parts={parts} materials={materials} selectedId={selectedId} />
+        <>
+          <SelectionLabel parts={parts} materials={materials} selectedId={selectedId} />
+          {secondaryId ? (
+            <PairDimensions
+              parts={parts}
+              materials={materials}
+              selectedId={selectedId}
+              secondaryId={secondaryId}
+            />
+          ) : (
+            <DimensionChips parts={parts} materials={materials} selectedId={selectedId} />
+          )}
+        </>
       )}
 
-      {target && (
+      {target && !measureEdges && (
         <TransformControls
           object={target}
           mode="translate"
@@ -447,13 +632,17 @@ function SceneContent() {
 
 export default function Scene3D() {
   const select = useProjectStore((s) => s.select)
+  const clearEdges = useUiStore((s) => s.clearEdges)
   return (
     <Canvas
       shadows
       dpr={[1, 2]}
       gl={{ logarithmicDepthBuffer: true }}
       camera={{ position: [1.2, 1, 1.4], fov: 45, near: 0.01, far: 100 }}
-      onPointerMissed={() => select(null)}
+      onPointerMissed={() => {
+        select(null)
+        clearEdges()
+      }}
       style={{ touchAction: 'none' }}
     >
       <SceneContent />

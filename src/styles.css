@@ -137,6 +137,9 @@ body {
   user-select: none;
 }
 .dim-draft.edge { border-color: #fbbf24; color: #fde68a; }
+.dim-draft.edge-pair { display: inline-flex; align-items: center; gap: 5px; cursor: pointer; }
+.dim-draft.edge-pair .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+.measure-toggle.on { background: #0e7490; border-color: #22d3ee; color: #fff; }
 
 .dim-input {
   width: 64px;

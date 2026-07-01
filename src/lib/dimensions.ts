@@ -74,6 +74,61 @@ export function computeDims(
 
 export type DimKind = 'gap' | 'min' | 'max'
 
+/** Ссылка на конкретную кромку (грань) детали. */
+export interface EdgeRef {
+  partId: string
+  axis: 0 | 1 | 2
+  side: 'min' | 'max'
+}
+
+/** Положение грани детали вдоль её оси, мм. */
+export function facePos(box: AABB, axis: 0 | 1 | 2, side: 'min' | 'max'): number {
+  return side === 'max' ? box.max[axis] : box.min[axis]
+}
+
+/** 4 угла грани (для подсветки), мм. */
+export function faceCorners(box: AABB, axis: 0 | 1 | 2, side: 'min' | 'max'): Vec3[] {
+  const b = ((axis + 1) % 3) as 0 | 1 | 2
+  const c = ((axis + 2) % 3) as 0 | 1 | 2
+  const a = facePos(box, axis, side)
+  const mk = (sb: number, sc: number): Vec3 => {
+    const p: Vec3 = [0, 0, 0]
+    p[axis] = a
+    p[b] = sb
+    p[c] = sc
+    return p
+  }
+  return [
+    mk(box.min[b], box.min[c]),
+    mk(box.max[b], box.min[c]),
+    mk(box.max[b], box.max[c]),
+    mk(box.min[b], box.max[c]),
+  ]
+}
+
+/**
+ * Новая позиция центра детали mover, чтобы её грань (moverSide по оси axis)
+ * встала на расстоянии value от неподвижной грани anchorPos (в текущем
+ * направлении dir).
+ */
+export function applyEdgePair(
+  mover: Part,
+  materials: Material[],
+  moverSide: 'min' | 'max',
+  axis: 0 | 1 | 2,
+  anchorPos: number,
+  dir: 1 | -1,
+  value: number,
+): Vec3 {
+  const M = aabbOf(mover, materials)
+  const half = M.size[axis] / 2
+  const sideOffset = moverSide === 'max' ? half : -half
+  const newFace = anchorPos + dir * value
+  const pos: Vec3 = [...mover.position] as Vec3
+  pos[axis] = newFace - sideOffset
+  return pos
+}
+
 export interface PairDim {
   axis: 0 | 1 | 2
   start: Vec3 // измеряемая точка 1 (на грани), мм
